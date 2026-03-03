@@ -1,0 +1,186 @@
+# ===========================================
+# TFSA 1 - 공격적 개인 투자
+# ===========================================
+tfsa1_assets:
+  - name: "QQC - NASDAQ Canada"
+    ticker: "QQC.TO"
+    account: "TFSA1"
+    strategy: "aggressive"
+    risk_tolerance: "high"
+    trading_style: "active"
+    keywords: ["QQC", "나스닥", "NASDAQ", "기술주"]
+  
+  - name: "QQQM - NASDAQ US"
+    ticker: "QQQM"
+    account: "TFSA1"
+    strategy: "aggressive"
+    risk_tolerance: "high"
+    trading_style: "active"
+    keywords: ["QQQM", "Invesco", "NASDAQ", "QQQ"]
+  
+  - name: "VFV - Vanguard S&P500 CAD"
+    ticker: "VFV.TO"
+    account: "TFSA1"
+    strategy: "aggressive"
+    risk_tolerance: "high"
+    trading_style: "active"
+    keywords: ["VFV", "Vanguard", "S&P500"]
+  
+  - name: "VOO - Vanguard S&P500 USD"
+    ticker: "VOO"
+    account: "TFSA1"
+    strategy: "aggressive"
+    risk_tolerance: "high"
+    trading_style: "active"
+    keywords: ["VOO", "Vanguard", "S&P 500"]
+  
+  - name: "XETM - Emerging Markets"
+    ticker: "XETM.TO"
+    account: "TFSA1"
+    strategy: "aggressive"
+    risk_tolerance: "high"
+    trading_style: "active"
+    keywords: ["XETM", "신흥국", "emerging markets"]
+
+# ===========================================
+# TFSA 2 - 보수적 목적별 저축
+# ===========================================
+tfsa2_assets:
+  - name: "CASH - 여자친구 이벤트 자금"
+    ticker: "CASH.TO"
+    account: "TFSA2"
+    strategy: "conservative"
+    risk_tolerance: "low"
+    trading_style: "all_in_only"
+    purpose: "여친 이벤트"
+    withdrawal_months: [2, 5, 9, 11, 12]
+    monthly_contribution: 210
+    keywords: ["CASH", "현금", "단기"]
+  
+  - name: "XEI - 어머님께 드릴 자금"
+    ticker: "XEI.TO"
+    account: "TFSA2"
+    strategy: "conservative"
+    risk_tolerance: "low"
+    trading_style: "all_in_only"
+    purpose: "어머님께 $10,000"
+    target_amount: 10000
+    monthly_contribution: 250
+    keywords: ["XEI", "배당", "dividend"]
+
+# ===========================================
+# 거래 규칙
+# ===========================================
+trading_rules:
+  # 현금 최소화 원칙
+  cash_policy:
+    target_cash_ratio: 0  # 0% 현금 유지
+    max_cash_days: 14  # 최대 2주만 현금 보유
+    
+  # 매도 시 즉시 재투자
+  reinvestment:
+    required: true
+    options_to_show: 5  # 상위 5개 대안 제시
+    
+  # 계좌별 규칙
+  tfsa1:
+    allow_partial_sell: true  # 부분 매도 가능
+    allow_leverage_etf: true  # 레버리지 ETF 허용
+    
+  tfsa2:
+    allow_partial_sell: false  # All-in만
+    allow_leverage_etf: false  # 레버리지 금지
+
+# ===========================================
+# 비용 계산 설정
+# ===========================================
+cost_settings:
+  broker: "Wealthsimple"
+  fx_fee: 0.015  # 1.5% 환전 수수료 (양방향)
+  default_holding_months: 3  # 기본 보유 기간
+  
+  # 순수익 계산 시 고려사항
+  include_in_calculation:
+    - fx_fee
+    - mer
+    - dividend_tax  # 미국주식 15% 원천징수
+
+# ===========================================
+# 추천 기준
+# ===========================================
+recommendation_rules:
+  # TFSA1: 수익성 우선
+  tfsa1:
+    priority: "net_return"  # 순수익 최우선
+    min_confidence: 65
+    time_horizon: "short_to_mid"  # 1주~3개월
+    
+    scoring_weights:
+      profit_potential: 0.40
+      momentum: 0.30
+      correlation: 0.20
+      liquidity: 0.10
+  
+  # TFSA2: 안정성 우선
+  tfsa2:
+    priority: "stability"
+    min_confidence: 80
+    time_horizon: "mid_to_long"  # 6개월+
+    
+    scoring_weights:
+      stability: 0.50
+      preservation: 0.30
+      liquidity: 0.20
+
+# ===========================================
+# 순위 표시 규칙
+# ===========================================
+ranking_rules:
+  sort_by: "net_return"  # 순수익 기준 정렬
+  show_top: 5  # 상위 5개
+  
+  # 동점일 때 우선순위
+  tie_breaker:
+    - "prefer_canadian"  # 캐나다 우선
+    - "lower_risk"
+    - "higher_liquidity"
+  
+  # 표시 옵션
+  display:
+    show_cost_breakdown: true  # 비용 상세
+    show_comparison: true  # 1위 vs 2위
+    use_emoji: true  # 🥇🥈🥉
+
+# ===========================================
+# 긴급 알림 트리거
+# ===========================================
+emergency_triggers:
+  price_change:
+    threshold: 0.07  # ±7% 이상
+    
+  keywords:
+    negative: ["파산", "조사", "회계부정", "CEO 사퇴", "상장폐지", "거래정지"]
+    positive: ["인수합병", "실적 서프라이즈", "신제품 대박"]
+  
+  market_events:
+    - "금리 긴급 인상"
+    - "시장 서킷브레이커"
+    - "지정학적 위기"
+
+# ===========================================
+# 스왑 우선순위 설정
+# ===========================================
+swap_priority:
+  tfsa1:
+    sell_first:
+      - "중복 자산"  # VFV vs VOO
+      - "손실 자산"
+      - "약세 자산"
+    
+    protect:
+      - "목적 자금"
+  
+  tfsa2:
+    # 전량 교체만 가능
+    protect_before_withdrawal:
+      days: 14  # 출금 2주 전부터 보호
