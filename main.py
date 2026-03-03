@@ -303,7 +303,6 @@ class FinancialAgent:
             await bot.send_message(
                 chat_id=self.telegram_chat_id,
                 text=message,
-                parse_mode='Markdown',
                 disable_web_page_preview=True
             )
         else:
@@ -312,7 +311,6 @@ class FinancialAgent:
                 await bot.send_message(
                     chat_id=self.telegram_chat_id,
                     text=part,
-                    parse_mode='Markdown',
                     disable_web_page_preview=True
                 )
     
