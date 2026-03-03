@@ -1,0 +1,45 @@
+name: Check Telegram Approvals
+
+on:
+  schedule:
+    # 매 시간마다 승인 체크
+    - cron: '*/60 * * * *'
+  
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+    - name: 코드 체크아웃
+      uses: actions/checkout@v3
+      with:
+        token: ${{ secrets.GH_TOKEN }}
+    
+    - name: Python 설정
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: 패키지 설치
+      run: |
+        pip install --upgrade pip
+        pip install pyyaml requests python-telegram-bot pytz
+    
+    - name: 승인 메시지 확인
+      run: python approval_handler.py
+      env:
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+    
+    - name: 변경사항 확인
+      run: |
+        if git diff --quiet; then
+          echo "변경사항 없음"
+        else
+          echo "포트폴리오 업데이트됨!"
+        fi
