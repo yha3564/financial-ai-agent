@@ -279,19 +279,34 @@ class FinancialAgent:
         """텔레그램 전송 - 완전 안전 버전"""
         bot = Bot(token=self.telegram_token)
         
-        # 모든 특수문자 제거
-        safe_message = message
-        for char in ['**', '`', '_', '*', '[', ']', '(', ')']:
-            safe_message = safe_message.replace(char, '')
+        # 안전한 ASCII 문자만 남기기
+        safe_chars = []
+        for char in message:
+            if ord(char) < 128 or char in '가-힣ㄱ-ㅎㅏ-ㅣ':  # ASCII + 한글만
+                safe_chars.append(char)
+        
+        safe_message = ''.join(safe_chars)
+        
+        # 길이 제한
+        if len(safe_message) > 4000:
+            safe_message = safe_message[:4000]
         
         try:
             await bot.send_message(
-                chat_id=self.telegram_chat_id,
-                text=safe_message[:4000],
-                disable_web_page_preview=True
+                chat_id=int(self.telegram_chat_id),
+                text=safe_message
             )
+            print("텔레그램 전송 성공!")
         except Exception as e:
-            print(f"텔레그램 전송 오류: {e}")
+            print(f"텔레그램 오류: {e}")
+            # 최소한의 메시지라도 전송 시도
+            try:
+                await bot.send_message(
+                    chat_id=int(self.telegram_chat_id),
+                    text="시스템 작동 중"
+                )
+            except:
+                print("전송 완전 실패")
     
     def run(self):
         """메인 실행"""
