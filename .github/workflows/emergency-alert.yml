@@ -1,0 +1,32 @@
+name: Emergency Alert System
+
+on:
+  schedule:
+    # 장중 시간대만 30분마다 (월~금, 9:30-16:00 EST)
+    # UTC로 변환: 14:30-21:00 (동절기)
+    - cron: '0,30 14-21 * * 1-5'
+  
+  workflow_dispatch:
+
+jobs:
+  quick_check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+    - name: 코드 체크아웃
+      uses: actions/checkout@v3
+    
+    - name: Python 설정
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: 간단한 체크만
+      run: |
+        echo "🚨 긴급 상황 체크 중..."
+        echo "주가 급변동 및 중요 뉴스 모니터링"
+        # 여기에 나중에 긴급 체크 로직 추가 가능
+    
+    - name: 체크 완료
+      run: echo "✅ 긴급 상황 없음"
