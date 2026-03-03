@@ -221,24 +221,24 @@ class FinancialAgent:
         """리포트 생성"""
         toronto_time = datetime.now(self.toronto_tz).strftime('%Y-%m-%d %H:%M %Z')
         
-        report = f"📊 **일일 금융 브리핑**\n"
+        report = f"📊 일일 금융 브리핑\n"
         report += f"🕐 {toronto_time}\n"
         report += f"{'='*40}\n\n"
         
         # TFSA1 매도 신호
         tfsa1_sells = [a for a in analyses if a and a['signal'] == 'SELL' and a['confidence'] >= 65 and a['account'] == 'TFSA1']
         if tfsa1_sells:
-            report += "🔴 **TFSA 1 - 매도 + 재투자**\n\n"
+            report += "🔴 TFSA 1 - 매도 + 재투자\n\n"
             for item in tfsa1_sells:
-                report += f"**{item['asset']}**\n"
+                report += f"{item['asset']}\n"
                 report += f"📰 {item['title']}\n"
                 report += f"⚠️ {item['reason']}\n"
                 report += f"신뢰도: {item['confidence']}%\n\n"
                 
                 alternatives = self.search_alternatives(item)
                 if alternatives:
-                    report += "💰 **TFSA 1 내 재투자 TOP 3**\n"
-                    report += "_(부분 매도 가능)_\n\n"
+                    report += "💰 TFSA 1 내 재투자 TOP 3\n"
+                    report += "(부분 매도 가능)\n\n"
                     medals = ['🥇', '🥈', '🥉']
                     for i, alt in enumerate(alternatives[:3]):
                         medal = medals[i] if i < 3 else f"{i+1}위"
@@ -247,24 +247,24 @@ class FinancialAgent:
                         report += f"   순수익: +{alt['net_return']*100:.1f}%\n\n"
                 
                 report += f"🔗 {item['url']}\n"
-                report += f"\n✅ 승인: `승인 [티커] [비율]`\n"
-                report += f"예: `승인 HXQ 50` (50% 매도→매수)\n"
+                report += f"\n✅ 승인: 승인 [티커] [비율]\n"
+                report += f"예: 승인 HXQ 50 (50% 매도→매수)\n"
                 report += f"{'-'*40}\n\n"
         
         # TFSA2 매도 신호
         tfsa2_sells = [a for a in analyses if a and a['signal'] == 'SELL' and a['confidence'] >= 80 and a['account'] == 'TFSA2']
         if tfsa2_sells:
-            report += "🔴 **TFSA 2 - 전량 교체**\n\n"
+            report += "🔴 TFSA 2 - 전량 교체\n\n"
             for item in tfsa2_sells:
-                report += f"**{item['asset']}**\n"
+                report += f"{item['asset']}\n"
                 report += f"📰 {item['title']}\n"
                 report += f"⚠️ {item['reason']}\n"
                 report += f"신뢰도: {item['confidence']}%\n\n"
                 
                 alternatives = self.search_alternatives(item)
                 if alternatives:
-                    report += "💰 **TFSA 2 내 재투자 TOP 3**\n"
-                    report += "⚠️ _All-in 전환만 가능_\n\n"
+                    report += "💰 TFSA 2 내 재투자 TOP 3\n"
+                    report += "⚠️ All-in 전환만 가능\n\n"
                     medals = ['🥇', '🥈', '🥉']
                     for i, alt in enumerate(alternatives[:3]):
                         medal = medals[i] if i < 3 else f"{i+1}위"
@@ -273,23 +273,23 @@ class FinancialAgent:
                         report += f"   순수익: +{alt['net_return']*100:.1f}%\n\n"
                 
                 report += f"🔗 {item['url']}\n"
-                report += f"\n✅ 승인: `승인 [티커]`\n"
-                report += f"예: `승인 ZAG` (전량 교체)\n"
+                report += f"\n✅ 승인: 승인 [티커]\n"
+                report += f"예: 승인 ZAG (전량 교체)\n"
                 report += f"{'-'*40}\n\n"
         
         # 매수 신호
         buys = [a for a in analyses if a and a['signal'] == 'BUY' and a['confidence'] >= 70]
         if buys:
-            report += "🟢 **매수 기회**\n\n"
+            report += "🟢 매수 기회\n\n"
             for item in buys:
-                report += f"**{item['asset']}** ({item['account']})\n"
+                report += f"{item['asset']} ({item['account']})\n"
                 report += f"📰 {item['title']}\n"
                 report += f"💚 {item['reason']}\n"
                 report += f"신뢰도: {item['confidence']}%\n"
                 report += f"🔗 {item['url']}\n\n"
         
         if not tfsa1_sells and not tfsa2_sells and not buys:
-            report += "✅ **오늘은 특별한 시그널이 없습니다**\n"
+            report += "✅ 오늘은 특별한 시그널이 없습니다\n"
             report += "포트폴리오를 그대로 유지하세요.\n"
         
         return report
@@ -298,15 +298,18 @@ class FinancialAgent:
         """텔레그램 전송"""
         bot = Bot(token=self.telegram_token)
         
+        # 특수문자 제거 (안전한 전송)
+        safe_message = message.replace('**', '').replace('`', '').replace('_', '')
+        
         max_length = 4000
-        if len(message) <= max_length:
+        if len(safe_message) <= max_length:
             await bot.send_message(
                 chat_id=self.telegram_chat_id,
-                text=message,
+                text=safe_message,
                 disable_web_page_preview=True
             )
         else:
-            parts = [message[i:i+max_length] for i in range(0, len(message), max_length)]
+            parts = [safe_message[i:i+max_length] for i in range(0, len(safe_message), max_length)]
             for part in parts:
                 await bot.send_message(
                     chat_id=self.telegram_chat_id,
