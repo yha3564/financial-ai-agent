@@ -16,9 +16,6 @@ class FinancialAgent:
         self.groq_api_key = os.environ['GROQ_API_KEY']
         self.telegram_token = os.environ['TELEGRAM_BOT_TOKEN']
         self.telegram_chat_id = os.environ['TELEGRAM_CHAT_ID']
-        self.github_token = os.environ.get('GH_TOKEN', '')
-        self.repo_owner = os.environ.get('GITHUB_REPOSITORY', '').split('/')[0]
-        self.repo_name = os.environ.get('GITHUB_REPOSITORY', '').split('/')[1] if '/' in os.environ.get('GITHUB_REPOSITORY', '') else ''
         
         # Groq 설정
         self.groq_client = Groq(api_key=self.groq_api_key)
@@ -29,14 +26,6 @@ class FinancialAgent:
         
         # 토론토 시간대
         self.toronto_tz = pytz.timezone('America/Toronto')
-    
-    def get_account_assets(self, account):
-        """특정 계좌의 자산만 가져오기"""
-        if account == 'TFSA1':
-            return self.config.get('tfsa1_assets', [])
-        elif account == 'TFSA2':
-            return self.config.get('tfsa2_assets', [])
-        return []
     
     def fetch_news(self):
         """뉴스 수집"""
@@ -78,7 +67,6 @@ class FinancialAgent:
                     'ticker': ticker,
                     'title': article['title'],
                     'description': article.get('description', ''),
-                    'url': article['url'],
                     'published': article['publishedAt']
                 } for article in articles]
         except Exception as e:
@@ -105,12 +93,7 @@ class FinancialAgent:
         
         try:
             chat_completion = self.groq_client.chat.completions.create(
-                messages=[
-                    {
-                        "role": "user",
-                        "content": prompt,
-                    }
-                ],
+                messages=[{"role": "user", "content": prompt}],
                 model="llama-3.1-70b-versatile",
                 temperature=0.3,
                 max_tokens=500,
@@ -129,7 +112,6 @@ class FinancialAgent:
             'asset': news_item['asset'],
             'ticker': news_item['ticker'],
             'title': news_item['title'],
-            'url': news_item['url'],
             'signal': 'HOLD',
             'confidence': 50,
             'expected_return': 0,
@@ -138,13 +120,11 @@ class FinancialAgent:
         
         text_upper = text.upper()
         
-        # 신호 판단
         if '매도' in text or 'SELL' in text_upper:
             result['signal'] = 'SELL'
         elif '매수' in text or 'BUY' in text_upper:
             result['signal'] = 'BUY'
         
-        # 숫자 추출
         lines = text.split('\n')
         for line in lines:
             if '신뢰도' in line or 'confidence' in line.lower():
@@ -153,7 +133,6 @@ class FinancialAgent:
                     result['confidence'] = min(numbers[0], 100)
             
             if '예상수익' in line or 'expected' in line.lower() or 'return' in line.lower():
-                # 음수 처리
                 if '-' in line:
                     numbers = [int(s) for s in re.findall(r'\d+', line)]
                     if numbers:
@@ -169,15 +148,13 @@ class FinancialAgent:
         return result
     
     def search_alternatives(self, signal_data):
-        """대체 자산 검색 - 같은 계좌 내에서만!"""
+        """대체 자산 검색"""
         if signal_data['signal'] != 'SELL':
             return []
         
         account = signal_data['account']
         
-        # 계좌별 대안 리스트
         if account == 'TFSA1':
-            # TFSA1: 공격적 옵션
             alternatives = [
                 {'name': 'HXQ - NASDAQ Hedged', 'ticker': 'HXQ.TO', 'currency': 'CAD', 'expected_return': 0.12, 'mer': 0.003},
                 {'name': 'XLE - Energy Sector', 'ticker': 'XLE', 'currency': 'USD', 'expected_return': 0.15, 'mer': 0.001},
@@ -185,8 +162,7 @@ class FinancialAgent:
                 {'name': 'VFV - S&P500 CAD', 'ticker': 'VFV.TO', 'currency': 'CAD', 'expected_return': 0.09, 'mer': 0.0008},
                 {'name': 'QQC - NASDAQ CAD', 'ticker': 'QQC.TO', 'currency': 'CAD', 'expected_return': 0.11, 'mer': 0.0025}
             ]
-        else:  # TFSA2
-            # TFSA2: 보수적 옵션
+        else:
             alternatives = [
                 {'name': 'ZAG - Canadian Bonds', 'ticker': 'ZAG.TO', 'currency': 'CAD', 'expected_return': 0.055, 'mer': 0.0009},
                 {'name': 'VSB - Short Term Bonds', 'ticker': 'VSB.TO', 'currency': 'CAD', 'expected_return': 0.048, 'mer': 0.0011},
@@ -202,7 +178,6 @@ class FinancialAgent:
         
         ranked = []
         for alt in alternatives:
-            # 순수익 계산
             if alt['currency'] == 'USD':
                 invested = amount * (1 - fx_fee)
                 expected_value = invested * (1 + alt['expected_return'])
@@ -227,10 +202,10 @@ class FinancialAgent:
         return sorted(ranked, key=lambda x: x['net_return'], reverse=True)
     
     def generate_report(self, analyses):
-        """리포트 생성"""
+        """리포트 생성 - URL 없는 버전"""
         toronto_time = datetime.now(self.toronto_tz).strftime('%Y-%m-%d %H:%M %Z')
         
-        report = f"📊 일일 금융 브리핑 (Powered by Groq AI)\n"
+        report = f"📊 일일 금융 브리핑 (Groq AI)\n"
         report += f"🕐 {toronto_time}\n"
         report += f"{'='*40}\n\n"
         
@@ -250,13 +225,12 @@ class FinancialAgent:
                     report += "(부분 매도 가능)\n\n"
                     medals = ['🥇', '🥈', '🥉']
                     for i, alt in enumerate(alternatives[:3]):
-                        medal = medals[i] if i < 3 else f"{i+1}위"
+                        medal = medals[i]
                         flag = "🇺🇸" if alt['currency'] == 'USD' else "🇨🇦"
                         report += f"{medal} {alt['name']} {flag}\n"
                         report += f"   순수익: +{alt['net_return']*100:.1f}%\n\n"
                 
-                report += f"🔗 {item['url']}\n"
-                report += f"\n✅ 승인: 승인 [티커] [비율]\n"
+                report += f"✅ 승인: 승인 [티커] [비율]\n"
                 report += f"예: 승인 HXQ 50\n"
                 report += f"{'-'*40}\n\n"
         
@@ -276,13 +250,12 @@ class FinancialAgent:
                     report += "⚠️ All-in 전환만 가능\n\n"
                     medals = ['🥇', '🥈', '🥉']
                     for i, alt in enumerate(alternatives[:3]):
-                        medal = medals[i] if i < 3 else f"{i+1}위"
+                        medal = medals[i]
                         flag = "🇺🇸" if alt['currency'] == 'USD' else "🇨🇦"
                         report += f"{medal} {alt['name']} {flag}\n"
                         report += f"   순수익: +{alt['net_return']*100:.1f}%\n\n"
                 
-                report += f"🔗 {item['url']}\n"
-                report += f"\n✅ 승인: 승인 [티커]\n"
+                report += f"✅ 승인: 승인 [티커]\n"
                 report += f"예: 승인 ZAG\n"
                 report += f"{'-'*40}\n\n"
         
@@ -294,8 +267,7 @@ class FinancialAgent:
                 report += f"{item['asset']} ({item['account']})\n"
                 report += f"📰 {item['title']}\n"
                 report += f"💚 {item['reason']}\n"
-                report += f"신뢰도: {item['confidence']}%\n"
-                report += f"🔗 {item['url']}\n\n"
+                report += f"신뢰도: {item['confidence']}%\n\n"
         
         if not tfsa1_sells and not tfsa2_sells and not buys:
             report += "✅ 오늘은 특별한 시그널이 없습니다\n"
@@ -304,61 +276,47 @@ class FinancialAgent:
         return report
     
     async def send_telegram(self, message):
-        """텔레그램 전송 - URL 안전 처리"""
+        """텔레그램 전송 - 완전 안전 버전"""
         bot = Bot(token=self.telegram_token)
         
-        # URL 패턴 제거
-        import re
-        safe_message = re.sub(r'http[s]?://\S+', '[링크생략]', message)
+        # 모든 특수문자 제거
+        safe_message = message
+        for char in ['**', '`', '_', '*', '[', ']', '(', ')']:
+            safe_message = safe_message.replace(char, '')
         
-        # 특수문자 제거
-        safe_message = safe_message.replace('**', '').replace('`', '').replace('_', '')
-        
-        max_length = 4000
-        if len(safe_message) <= max_length:
+        try:
             await bot.send_message(
                 chat_id=self.telegram_chat_id,
-                text=safe_message,
+                text=safe_message[:4000],
                 disable_web_page_preview=True
             )
-        else:
-            parts = [safe_message[i:i+max_length] for i in range(0, len(safe_message), max_length)]
-            for part in parts:
-                await bot.send_message(
-                    chat_id=self.telegram_chat_id,
-                    text=part,
-                    disable_web_page_preview=True
-                )
+        except Exception as e:
+            print(f"텔레그램 전송 오류: {e}")
     
     def run(self):
         """메인 실행"""
         print("🤖 금융 AI 에이전트 시작 (Groq AI)...")
         print(f"시간: {datetime.now(self.toronto_tz).strftime('%Y-%m-%d %H:%M %Z')}")
         
-        # 1. 뉴스 수집
         print("\n📰 뉴스 수집 중...")
         news_list = self.fetch_news()
         print(f"   → {len(news_list)}개 뉴스 발견")
         
         if not news_list:
-            print("   ⚠️ 뉴스 없음")
             asyncio.run(self.send_telegram("📭 오늘은 관련 뉴스가 없습니다."))
             return
         
-        # 2. AI 분석
         print("\n🧠 Groq AI 분석 중...")
         analyses = []
         for news in news_list[:15]:
             result = self.analyze_with_ai(news)
             if result:
                 analyses.append(result)
-                print(f"   ✓ {result['asset']} ({result['account']}): {result['signal']} ({result['confidence']}%)")
+                print(f"   ✓ {result['asset']}: {result['signal']} ({result['confidence']}%)")
         
-        # 3. 리포트 생성
         print("\n📝 리포트 생성 중...")
         report = self.generate_report(analyses)
         
-        # 4. 텔레그램 전송
         print("\n📱 텔레그램 전송 중...")
         asyncio.run(self.send_telegram(report))
         
