@@ -3,7 +3,7 @@ import yaml
 import requests
 import json
 from datetime import datetime
-import google.generativeai as genai
+from groq import Groq
 from telegram import Bot
 import asyncio
 import pytz
@@ -13,16 +13,15 @@ class FinancialAgent:
     def __init__(self):
         # API 키 로드
         self.news_api_key = os.environ['NEWS_API_KEY']
-        self.gemini_api_key = os.environ['GEMINI_API_KEY']
+        self.groq_api_key = os.environ['GROQ_API_KEY']
         self.telegram_token = os.environ['TELEGRAM_BOT_TOKEN']
         self.telegram_chat_id = os.environ['TELEGRAM_CHAT_ID']
         self.github_token = os.environ.get('GH_TOKEN', '')
         self.repo_owner = os.environ.get('GITHUB_REPOSITORY', '').split('/')[0]
         self.repo_name = os.environ.get('GITHUB_REPOSITORY', '').split('/')[1] if '/' in os.environ.get('GITHUB_REPOSITORY', '') else ''
         
-        # Gemini 설정
-        genai.configure(api_key=self.gemini_api_key)
-        self.model = genai.GenerativeModel('gemini-pro')
+        # Groq 설정
+        self.groq_client = Groq(api_key=self.groq_api_key)
         
         # 포트폴리오 로드
         with open('portfolio.yaml', 'r', encoding='utf-8') as f:
@@ -88,11 +87,10 @@ class FinancialAgent:
         return []
     
     def analyze_with_ai(self, news_item):
-        """AI로 뉴스 분석"""
+        """Groq AI로 뉴스 분석"""
         account = news_item['account']
         
-        prompt = f"""
-당신은 전문 금융 애널리스트입니다. 다음 뉴스를 분석해주세요:
+        prompt = f"""당신은 전문 금융 애널리스트입니다. 다음 뉴스를 분석해주세요:
 
 자산: {news_item['asset']} ({news_item['ticker']})
 계좌: {account}
@@ -103,14 +101,25 @@ class FinancialAgent:
 판단: [매도/매수/중립]
 신뢰도: [0-100 숫자만]
 예상수익: [% 숫자만, 매도면 음수]
-이유: [한 문장으로 핵심만]
-"""
+이유: [한 문장으로 핵심만]"""
         
         try:
-            response = self.model.generate_content(prompt)
-            return self.parse_ai_response(response.text, news_item)
+            chat_completion = self.groq_client.chat.completions.create(
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    }
+                ],
+                model="llama-3.1-70b-versatile",
+                temperature=0.3,
+                max_tokens=500,
+            )
+            
+            response_text = chat_completion.choices[0].message.content
+            return self.parse_ai_response(response_text, news_item)
         except Exception as e:
-            print(f"AI 분석 오류: {e}")
+            print(f"Groq AI 분석 오류: {e}")
             return None
     
     def parse_ai_response(self, text, news_item):
@@ -221,7 +230,7 @@ class FinancialAgent:
         """리포트 생성"""
         toronto_time = datetime.now(self.toronto_tz).strftime('%Y-%m-%d %H:%M %Z')
         
-        report = f"📊 일일 금융 브리핑\n"
+        report = f"📊 일일 금융 브리핑 (Powered by Groq AI)\n"
         report += f"🕐 {toronto_time}\n"
         report += f"{'='*40}\n\n"
         
@@ -248,7 +257,7 @@ class FinancialAgent:
                 
                 report += f"🔗 {item['url']}\n"
                 report += f"\n✅ 승인: 승인 [티커] [비율]\n"
-                report += f"예: 승인 HXQ 50 (50% 매도→매수)\n"
+                report += f"예: 승인 HXQ 50\n"
                 report += f"{'-'*40}\n\n"
         
         # TFSA2 매도 신호
@@ -274,7 +283,7 @@ class FinancialAgent:
                 
                 report += f"🔗 {item['url']}\n"
                 report += f"\n✅ 승인: 승인 [티커]\n"
-                report += f"예: 승인 ZAG (전량 교체)\n"
+                report += f"예: 승인 ZAG\n"
                 report += f"{'-'*40}\n\n"
         
         # 매수 신호
@@ -319,7 +328,7 @@ class FinancialAgent:
     
     def run(self):
         """메인 실행"""
-        print("🤖 금융 AI 에이전트 시작...")
+        print("🤖 금융 AI 에이전트 시작 (Groq AI)...")
         print(f"시간: {datetime.now(self.toronto_tz).strftime('%Y-%m-%d %H:%M %Z')}")
         
         # 1. 뉴스 수집
@@ -333,7 +342,7 @@ class FinancialAgent:
             return
         
         # 2. AI 분석
-        print("\n🧠 AI 분석 중...")
+        print("\n🧠 Groq AI 분석 중...")
         analyses = []
         for news in news_list[:15]:
             result = self.analyze_with_ai(news)
