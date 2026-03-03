@@ -304,11 +304,15 @@ class FinancialAgent:
         return report
     
     async def send_telegram(self, message):
-        """텔레그램 전송"""
+        """텔레그램 전송 - URL 안전 처리"""
         bot = Bot(token=self.telegram_token)
         
-        # 특수문자 제거 (안전한 전송)
-        safe_message = message.replace('**', '').replace('`', '').replace('_', '')
+        # URL 패턴 제거
+        import re
+        safe_message = re.sub(r'http[s]?://\S+', '[링크생략]', message)
+        
+        # 특수문자 제거
+        safe_message = safe_message.replace('**', '').replace('`', '').replace('_', '')
         
         max_length = 4000
         if len(safe_message) <= max_length:
