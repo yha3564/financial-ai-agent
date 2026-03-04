@@ -367,13 +367,14 @@ Be concise. Only include assets with significant impact."""
         }
     
     def generate_tfsa1_recommendations(self, my_ranks, all_rankings):
-        """TFSA 1 추천 (현금 유입 고려)"""
+        """TFSA 1 추천 (현금 유입 고려, 점수 필터 ±2)"""
         monthly_cash = self.monthly_cash.get('tfsa1', 0)
         available_cash = monthly_cash
         actions = []
         
+        # 매도: 점수 -2 이하만
         for ticker, rank in my_ranks.items():
-            if rank['weighted_score'] < -5:
+            if rank['weighted_score'] < -2:
                 amount = self.my_holdings_tfsa1[ticker]
                 available_cash += amount
                 actions.append({
@@ -384,8 +385,9 @@ Be concise. Only include assets with significant impact."""
                     'reason': rank['technical']['reason']
                 })
         
+        # 매수: 점수 +2 이상만
         if available_cash > 0:
-            top_assets = [r for r in all_rankings[:5] if r['weighted_score'] > 5]
+            top_assets = [r for r in all_rankings[:5] if r['weighted_score'] > 2]
             
             for asset in top_assets[:3]:
                 if asset['ticker'] not in self.my_holdings_tfsa1:
@@ -396,6 +398,7 @@ Be concise. Only include assets with significant impact."""
                         'confidence': asset['confidence']
                     })
         
+        # 현금 정보 (항상 표시)
         actions.append({
             'action': 'CASH_AVAILABLE',
             'amount': available_cash,
@@ -405,7 +408,7 @@ Be concise. Only include assets with significant impact."""
         return actions
     
     def generate_tfsa2_recommendations(self, my_ranks, all_rankings):
-        """TFSA 2 추천 (전량 교체, CASH 제외)"""
+        """TFSA 2 추천 (전량 교체, CASH 제외, 점수 필터 +2)"""
         safe_rankings = [r for r in all_rankings if r['ticker'] in self.safe_assets]
         safe_rankings.sort(key=lambda x: x['weighted_score'], reverse=True)
         
@@ -413,6 +416,10 @@ Be concise. Only include assets with significant impact."""
             return []
         
         best_safe = safe_rankings[0]
+        
+        # 점수 2 미만이면 추천 안 함
+        if best_safe['weighted_score'] < 2:
+            return []
         
         current_tickers = list(self.my_holdings_tfsa2.keys())
         current_investments = [t for t in current_tickers if t != 'CASH.TO']
@@ -429,11 +436,66 @@ Be concise. Only include assets with significant impact."""
         
         return []
     
+    def update_portfolio_from_recommendations(self, recommendations):
+        """추천 기반 포트폴리오 자동 업데이트"""
+        print("\n🔄 포트폴리오 자동 업데이트 중...")
+        
+        updated = False
+        tfsa1 = recommendations['tfsa1']
+        tfsa2 = recommendations['tfsa2']
+        
+        # TFSA 1 처리
+        sells = [a for a in tfsa1 if a['action'] == 'SELL']
+        buys = [a for a in tfsa1 if a['action'] == 'BUY']
+        cash_info = [a for a in tfsa1 if a['action'] == 'CASH_AVAILABLE']
+        
+        # 매도 처리
+        for sell in sells:
+            if sell['ticker'] in self.my_holdings_tfsa1:
+                del self.my_holdings_tfsa1[sell['ticker']]
+                print(f"   ✅ TFSA1에서 {sell['ticker']} 제거")
+                updated = True
+        
+        # 매수 처리
+        if buys and cash_info:
+            available = cash_info[0]['amount']
+            num_buys = len(buys[:3])
+            
+            for buy in buys[:3]:
+                amount = available / num_buys
+                self.my_holdings_tfsa1[buy['ticker']] = amount
+                print(f"   ✅ TFSA1에 {buy['ticker']} ${amount:.0f} 추가")
+                updated = True
+        
+        # TFSA 2 처리
+        for rec in tfsa2:
+            if rec['action'] == 'SWITCH':
+                # 기존 자산 제거
+                if rec['from'] in self.my_holdings_tfsa2:
+                    amount = self.my_holdings_tfsa2[rec['from']]
+                    del self.my_holdings_tfsa2[rec['from']]
+                    print(f"   ✅ TFSA2에서 {rec['from']} 제거")
+                    
+                    # 새 자산 추가
+                    self.my_holdings_tfsa2[rec['to']] = amount
+                    print(f"   ✅ TFSA2에 {rec['to']} ${amount:.0f} 추가")
+                    updated = True
+        
+        # 파일 저장
+        if updated:
+            self.save_portfolio({
+                'tfsa1': self.my_holdings_tfsa1,
+                'tfsa2': self.my_holdings_tfsa2
+            })
+            print("✅ 포트폴리오 업데이트 완료!")
+        else:
+            print("✅ 변경사항 없음")
+    
     def format_telegram_report(self, recommendations):
         """텔레그램 리포트 생성"""
         report = f"📊 일일 브리핑\n"
         report += f"🕐 {self.now.strftime('%Y-%m-%d %H:%M %Z')}\n"
-        report += "===\n\n"
+        report += "="*37 + "\n\n"
         
         tfsa1 = recommendations['tfsa1']
         sells = [a for a in tfsa1 if a['action'] == 'SELL']
@@ -446,7 +508,7 @@ Be concise. Only include assets with significant impact."""
                 name = self.ticker_names.get(sell['ticker'], sell['ticker'])
                 report += f"매도: {sell['ticker']} ({name})\n"
                 report += f"금액: ${sell['amount']:.0f}\n\n"
-            report += "===\n\n"
+            report += "="*37 + "\n\n"
         
         if cash_info:
             report += f"💵 사용 가능: ${cash_info[0]['amount']:.0f}\n"
@@ -474,7 +536,7 @@ Be concise. Only include assets with significant impact."""
         tfsa2 = recommendations['tfsa2']
         if tfsa2:
             if sells or buys:
-                report += "===\n\n"
+                report += "="*37 + "\n\n"
             
             report += "💰 TFSA 2 전환\n\n"
             for rec in tfsa2:
@@ -521,8 +583,11 @@ Be concise. Only include assets with significant impact."""
         asset_impacts = self.aggregate_asset_impacts(all_news)
         rankings = self.create_rankings(asset_impacts)
         recommendations = self.generate_recommendations(rankings)
-        report = self.format_telegram_report(recommendations)
         
+        # 자동 업데이트
+        self.update_portfolio_from_recommendations(recommendations)
+        
+        report = self.format_telegram_report(recommendations)
         asyncio.run(self.send_telegram(report))
         
         print("\n✅ 완료!")
