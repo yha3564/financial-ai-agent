@@ -33,12 +33,14 @@ class IntradayMonitor:
         print(f"✅ 초기화 완료 - {self.now.strftime('%Y-%m-%d %H:%M %Z')}")
     
     def load_portfolio(self):
-        """포트폴리오 로드"""
+        """포트폴리오 로드 (읽기 전용)"""
         try:
             with open('current_portfolio.json', 'r', encoding='utf-8') as f:
                 portfolio = json.load(f)
                 self.my_holdings_tfsa1 = portfolio.get('tfsa1', {})
                 self.my_holdings_tfsa2 = portfolio.get('tfsa2', {})
+                self.accumulated_cash = portfolio.get('accumulated_cash', 0)
+                self.last_cash_added = portfolio.get('last_cash_added', '')
         except FileNotFoundError:
             with open('portfolio.yaml', 'r', encoding='utf-8') as f:
                 config = yaml.safe_load(f)
@@ -50,6 +52,9 @@ class IntradayMonitor:
             self.my_holdings_tfsa2 = {}
             for asset in config.get('tfsa2_assets', []):
                 self.my_holdings_tfsa2[asset['ticker']] = asset['amount']
+            
+            self.accumulated_cash = 0
+            self.last_cash_added = ''
         
         with open('portfolio.yaml', 'r', encoding='utf-8') as f:
             config = yaml.safe_load(f)
