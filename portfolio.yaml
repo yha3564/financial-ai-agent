@@ -4,7 +4,8 @@
 tfsa1_assets:
   - name: "QQC - NASDAQ Canada"
     ticker: "QQC.TO"
-    amount: 99.13
+    amount: 99.23
+    shares: 2.435
     account: "TFSA1"
     strategy: "aggressive"
     risk_tolerance: "high"
@@ -13,7 +14,8 @@ tfsa1_assets:
   
   - name: "QQQM - NASDAQ US"
     ticker: "QQQM"
-    amount: 127.32
+    amount: 127.69
+    shares: 0.5068
     account: "TFSA1"
     strategy: "aggressive"
     risk_tolerance: "high"
@@ -22,7 +24,8 @@ tfsa1_assets:
   
   - name: "VFV - Vanguard S&P500 CAD"
     ticker: "VFV.TO"
-    amount: 147.52
+    amount: 147.44
+    shares: 0.8855
     account: "TFSA1"
     strategy: "aggressive"
     risk_tolerance: "high"
@@ -31,7 +34,8 @@ tfsa1_assets:
   
   - name: "VOO - Vanguard S&P500 USD"
     ticker: "VOO"
-    amount: 246.93
+    amount: 247.45
+    shares: 0.3919
     account: "TFSA1"
     strategy: "aggressive"
     risk_tolerance: "high"
@@ -41,6 +45,7 @@ tfsa1_assets:
   - name: "XETM - Emerging Markets"
     ticker: "XETM.TO"
     amount: 180.07
+    shares: 2.0921
     account: "TFSA1"
     strategy: "aggressive"
     risk_tolerance: "high"
@@ -54,6 +59,7 @@ tfsa2_assets:
   - name: "CASH - 여자친구 이벤트 자금"
     ticker: "CASH.TO"
     amount: 1031.42
+    shares: 20.6387
     account: "TFSA2"
     strategy: "conservative"
     risk_tolerance: "low"
@@ -66,6 +72,7 @@ tfsa2_assets:
   - name: "XEI - 어머님께 드릴 자금"
     ticker: "XEI.TO"
     amount: 1525.06
+    shares: 42.4335
     account: "TFSA2"
     strategy: "conservative"
     risk_tolerance: "low"
