@@ -171,8 +171,16 @@ Be concise. Only include assets with significant impact."""
             
             for ticker, data in impacts.items():
                 if ticker in asset_scores:
-                    magnitude = data.get('magnitude', 0)
-                    confidence = data.get('confidence', 50) / 100
+                    # 안전한 타입 변환
+                    try:
+                        magnitude = float(data.get('magnitude', 0))
+                    except (ValueError, TypeError):
+                        magnitude = 0
+                    
+                    try:
+                        confidence = float(data.get('confidence', 50)) / 100
+                    except (ValueError, TypeError):
+                        confidence = 0.5
                     
                     if data.get('impact') == 'bearish':
                         magnitude = -magnitude
