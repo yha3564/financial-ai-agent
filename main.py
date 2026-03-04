@@ -78,27 +78,26 @@ class DailyDigest:
         all_assets.update(self.alternative_assets)
         all_assets.update(self.safe_assets)
         return list(all_assets)
-
+    
     def build_ticker_name_map(self):
-    """티커 → 이름 매핑"""
-    self.ticker_names = {}
+        """티커 → 이름 매핑"""
+        self.ticker_names = {}
+        
+        with open('portfolio.yaml', 'r', encoding='utf-8') as f:
+            config = yaml.safe_load(f)
+        
+        for asset in config.get('tfsa1_assets', []):
+            self.ticker_names[asset['ticker']] = asset['name']
+        
+        for asset in config.get('tfsa2_assets', []):
+            self.ticker_names[asset['ticker']] = asset['name']
+        
+        for asset in config.get('alternative_assets', []):
+            self.ticker_names[asset['ticker']] = asset['name']
+        
+        for asset in config.get('safe_assets', []):
+            self.ticker_names[asset['ticker']] = asset['name']
     
-    # TFSA1 자산
-    with open('portfolio.yaml', 'r', encoding='utf-8') as f:
-        config = yaml.safe_load(f)
-    
-    for asset in config.get('tfsa1_assets', []):
-        self.ticker_names[asset['ticker']] = asset['name']
-    
-    for asset in config.get('tfsa2_assets', []):
-        self.ticker_names[asset['ticker']] = asset['name']
-    
-    for asset in config.get('alternative_assets', []):
-        self.ticker_names[asset['ticker']] = asset['name']
-    
-    for asset in config.get('safe_assets', []):
-        self.ticker_names[asset['ticker']] = asset['name']
-
     def save_portfolio(self, portfolio_data):
         """포트폴리오 저장"""
         portfolio_data['date'] = self.now.strftime('%Y-%m-%d')
@@ -192,7 +191,6 @@ Be concise. Only include assets with significant impact."""
             
             for ticker, data in impacts.items():
                 if ticker in asset_scores:
-                    # 안전한 타입 변환
                     try:
                         magnitude = float(data.get('magnitude', 0))
                     except (ValueError, TypeError):
@@ -438,40 +436,40 @@ Be concise. Only include assets with significant impact."""
         report += "="*37 + "\n\n"
         
         tfsa1 = recommendations['tfsa1']
-        if tfsa1:
-            sells = [a for a in tfsa1 if a['action'] == 'SELL']
-            buys = [a for a in tfsa1 if a['action'] == 'BUY']
-            cash_info = [a for a in tfsa1 if a['action'] == 'CASH_AVAILABLE']
-            
-            if sells:
-                report += "🚨 TFSA 1 매도\n\n"
-                for sell in sells:
-                    name = self.ticker_names.get(sell['ticker'], sell['ticker'])
-                    report += f"매도: {sell['ticker']} ({name})\n"
-                    report += f"금액: ${sell['amount']:.0f}\n"
-                    report += f"점수: {sell['score']:.1f}\n"
-                    report += f"기술: {sell['reason']}\n\n"
-            
-            if cash_info:
-                report += f"💵 사용 가능: ${cash_info[0]['amount']:.0f}\n"
-                report += f"({cash_info[0]['source']})\n\n"
-            
-            if buys:
-                report += "💰 매수 추천 (TOP 3)\n\n"
-                for i, buy in enumerate(buys[:3], 1):
-                    from_name = self.ticker_names.get(rec['from'], rec['from'])
-                    to_name = self.ticker_names.get(rec['to'], rec['to'])
-                    report += f"{rec['from']} ({from_name})\n"
-                    report += f"  ↓\n"
-                    report += f"{rec['to']} ({to_name})\n"
-                    report += f"점수: {rec['score']:.1f}\n"
-                    report += f"{rec['reason']}\n\n"
+        sells = [a for a in tfsa1 if a['action'] == 'SELL']
+        buys = [a for a in tfsa1 if a['action'] == 'BUY']
+        cash_info = [a for a in tfsa1 if a['action'] == 'CASH_AVAILABLE']
+        
+        if sells:
+            report += "🚨 TFSA 1 매도\n\n"
+            for sell in sells:
+                name = self.ticker_names.get(sell['ticker'], sell['ticker'])
+                report += f"매도: {sell['ticker']} ({name})\n"
+                report += f"금액: ${sell['amount']:.0f}\n"
+                report += f"점수: {sell['score']:.1f}\n"
+                report += f"기술: {sell['reason']}\n\n"
+        
+        if cash_info:
+            report += f"💵 사용 가능: ${cash_info[0]['amount']:.0f}\n"
+            report += f"({cash_info[0]['source']})\n\n"
+        
+        if buys:
+            report += "💰 매수 추천 (TOP 3)\n\n"
+            for i, buy in enumerate(buys[:3], 1):
+                name = self.ticker_names.get(buy['ticker'], buy['ticker'])
+                report += f"{i}. {buy['ticker']} ({name})\n"
+                report += f"   점수: {buy['score']:.1f}\n"
+                report += f"   신뢰도: {buy['confidence']}%\n\n"
         
         tfsa2 = recommendations['tfsa2']
         if tfsa2:
             report += "💰 TFSA 2 전환\n\n"
             for rec in tfsa2:
-                report += f"{rec['from']} → {rec['to']}\n"
+                from_name = self.ticker_names.get(rec['from'], rec['from'])
+                to_name = self.ticker_names.get(rec['to'], rec['to'])
+                report += f"{rec['from']} ({from_name})\n"
+                report += f"  ↓\n"
+                report += f"{rec['to']} ({to_name})\n"
                 report += f"점수: {rec['score']:.1f}\n"
                 report += f"{rec['reason']}\n\n"
         
