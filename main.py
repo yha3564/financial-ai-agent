@@ -27,6 +27,7 @@ class DailyDigest:
         
         self.load_portfolio()
         self.all_tracked_assets = self.build_all_assets_list()
+        self.build_ticker_name_map()
         
         print(f"✅ 초기화 완료 - {self.now.strftime('%Y-%m-%d %H:%M %Z')}")
         print(f"📊 추적 자산: {len(self.all_tracked_assets)}개")
@@ -77,7 +78,27 @@ class DailyDigest:
         all_assets.update(self.alternative_assets)
         all_assets.update(self.safe_assets)
         return list(all_assets)
+
+    def build_ticker_name_map(self):
+    """티커 → 이름 매핑"""
+    self.ticker_names = {}
     
+    # TFSA1 자산
+    with open('portfolio.yaml', 'r', encoding='utf-8') as f:
+        config = yaml.safe_load(f)
+    
+    for asset in config.get('tfsa1_assets', []):
+        self.ticker_names[asset['ticker']] = asset['name']
+    
+    for asset in config.get('tfsa2_assets', []):
+        self.ticker_names[asset['ticker']] = asset['name']
+    
+    for asset in config.get('alternative_assets', []):
+        self.ticker_names[asset['ticker']] = asset['name']
+    
+    for asset in config.get('safe_assets', []):
+        self.ticker_names[asset['ticker']] = asset['name']
+
     def save_portfolio(self, portfolio_data):
         """포트폴리오 저장"""
         portfolio_data['date'] = self.now.strftime('%Y-%m-%d')
@@ -425,7 +446,9 @@ Be concise. Only include assets with significant impact."""
             if sells:
                 report += "🚨 TFSA 1 매도\n\n"
                 for sell in sells:
-                    report += f"매도: {sell['ticker']} ${sell['amount']:.0f}\n"
+                    name = self.ticker_names.get(sell['ticker'], sell['ticker'])
+                    report += f"매도: {sell['ticker']} ({name})\n"
+                    report += f"금액: ${sell['amount']:.0f}\n"
                     report += f"점수: {sell['score']:.1f}\n"
                     report += f"기술: {sell['reason']}\n\n"
             
@@ -436,9 +459,13 @@ Be concise. Only include assets with significant impact."""
             if buys:
                 report += "💰 매수 추천 (TOP 3)\n\n"
                 for i, buy in enumerate(buys[:3], 1):
-                    report += f"{i}. {buy['ticker']}\n"
-                    report += f"   점수: {buy['score']:.1f}\n"
-                    report += f"   신뢰도: {buy['confidence']}%\n\n"
+                    from_name = self.ticker_names.get(rec['from'], rec['from'])
+                    to_name = self.ticker_names.get(rec['to'], rec['to'])
+                    report += f"{rec['from']} ({from_name})\n"
+                    report += f"  ↓\n"
+                    report += f"{rec['to']} ({to_name})\n"
+                    report += f"점수: {rec['score']:.1f}\n"
+                    report += f"{rec['reason']}\n\n"
         
         tfsa2 = recommendations['tfsa2']
         if tfsa2:
