@@ -59,8 +59,12 @@ class DailyDigest:
             for asset in config.get('tfsa2_assets', []):
                 self.my_holdings_tfsa2[asset['ticker']] = asset['amount']
             
-            self.accumulated_cash = 0
+            # 첫 실행 시 초기 현금 설정
+            monthly_cash_config = config.get('monthly_cash_inflow', {})
+            self.accumulated_cash = monthly_cash_config.get('tfsa1', 0)
             self.last_cash_added = ''
+            
+            print(f"💵 첫 실행 - 초기 현금: ${self.accumulated_cash}")
             
             self.save_portfolio({
                 'tfsa1': self.my_holdings_tfsa1,
@@ -398,7 +402,7 @@ Be concise. Only include assets with significant impact."""
         }
     
     def generate_tfsa1_recommendations(self, my_ranks, all_rankings):
-        """TFSA 1 추천 (누적 현금 사용, 점수 필터 ±2)"""
+        """TFSA 1 추천 (AI 판단: 집중 vs 분산, 매월 1일 무조건 투자)"""
         available_cash = self.accumulated_cash
         actions = []
         
@@ -415,17 +419,54 @@ Be concise. Only include assets with significant impact."""
                     'reason': rank['technical']['reason']
                 })
         
-        # 매수: 점수 +2 이상만
+        # 매수 로직 (AI 판단)
         if available_cash > 0:
-            top_assets = [r for r in all_rankings[:5] if r['weighted_score'] > 2]
+            # 매월 1일: 점수 무시하고 무조건 투자!
+            is_first_day = self.now.day == 1
             
-            for asset in top_assets[:3]:
-                if asset['ticker'] not in self.my_holdings_tfsa1:
+            if is_first_day:
+                # 1일: TOP 자산들 (점수 무시)
+                top_assets = [r for r in all_rankings[:10] 
+                             if r['ticker'] not in self.my_holdings_tfsa1]
+            else:
+                # 평일: 점수 +2 이상만
+                top_assets = [r for r in all_rankings[:10] 
+                             if r['weighted_score'] > 2 
+                             and r['ticker'] not in self.my_holdings_tfsa1]
+            
+            # AI 판단: 집중 vs 분산
+            if top_assets:
+                top_3 = top_assets[:3]
+                
+                if len(top_3) >= 2:
+                    score_diff = top_3[0]['weighted_score'] - top_3[1]['weighted_score']
+                    
+                    # 점수 차이로 판단
+                    if score_diff >= 3.0:
+                        # 1개 집중 (확실한 승자)
+                        num_buys = 1
+                        strategy = "집중"
+                    elif score_diff >= 2.0:
+                        # 2개 분산 (중간)
+                        num_buys = 2
+                        strategy = "분산(2)"
+                    else:
+                        # 3개 분산 (비슷함)
+                        num_buys = 3
+                        strategy = "분산(3)"
+                else:
+                    # 1개만 있으면 집중
+                    num_buys = 1
+                    strategy = "집중"
+                
+                # 매수 추천 생성
+                for i in range(min(num_buys, len(top_3))):
                     actions.append({
                         'action': 'BUY',
-                        'ticker': asset['ticker'],
-                        'score': asset['weighted_score'],
-                        'confidence': asset['confidence']
+                        'ticker': top_3[i]['ticker'],
+                        'score': top_3[i]['weighted_score'],
+                        'confidence': top_3[i]['confidence'],
+                        'strategy': strategy  # 전략 표시
                     })
         
         # 현금 정보 (항상 표시)
@@ -434,6 +475,10 @@ Be concise. Only include assets with significant impact."""
             cash_source.append(f"${self.accumulated_cash:.0f} 누적")
         if available_cash > self.accumulated_cash:
             cash_source.append("매도금")
+        
+        # 매월 1일이면 표시
+        if self.now.day == 1 and self.accumulated_cash > 0:
+            cash_source.append("(1일 즉시 투자)")
         
         actions.append({
             'action': 'CASH_AVAILABLE',
@@ -444,7 +489,7 @@ Be concise. Only include assets with significant impact."""
         return actions
     
     def generate_tfsa2_recommendations(self, my_ranks, all_rankings):
-        """TFSA 2 추천 (전량 교체, CASH 제외, 점수 필터 +2)"""
+        """TFSA 2 추천 (전량 교체, 점수 필터 +2)"""
         safe_rankings = [r for r in all_rankings if r['ticker'] in self.safe_assets]
         safe_rankings.sort(key=lambda x: x['weighted_score'], reverse=True)
         
@@ -458,10 +503,10 @@ Be concise. Only include assets with significant impact."""
             return []
         
         current_tickers = list(self.my_holdings_tfsa2.keys())
-        current_investments = [t for t in current_tickers if t != 'CASH.TO']
         
-        if current_investments and current_investments[0] != best_safe['ticker']:
-            current = current_investments[0]
+        # CASH.TO도 포함 (제외 안 함)
+        if current_tickers and current_tickers[0] != best_safe['ticker']:
+            current = current_tickers[0]
             return [{
                 'action': 'SWITCH',
                 'from': current,
@@ -494,16 +539,19 @@ Be concise. Only include assets with significant impact."""
                 print(f"   ✅ TFSA1에서 {sell['ticker']} 제거 (+${amount:.0f})")
                 updated = True
         
-        # 매수 처리
+        # 매수 처리 (AI 판단: 1개 or 2-3개)
         if buys and cash_info:
             available = cash_info[0]['amount']
-            num_buys = len(buys[:3])
+            num_buys = len(buys)
             
-            for buy in buys[:3]:
+            # 균등 분할
+            for buy in buys:
                 amount = available / num_buys
                 self.my_holdings_tfsa1[buy['ticker']] = amount
                 self.accumulated_cash -= amount
-                print(f"   ✅ TFSA1에 {buy['ticker']} ${amount:.0f} 추가 (-${amount:.0f})")
+                
+                strategy = buy.get('strategy', '집중')
+                print(f"   ✅ TFSA1에 {buy['ticker']} ${amount:.0f} 추가 ({strategy})")
                 updated = True
         
         # TFSA 2 처리
@@ -556,21 +604,26 @@ Be concise. Only include assets with significant impact."""
             report += f"({cash_info[0]['source']})\n\n"
         
         if buys:
-            report += "💰 매수 추천\n\n"
-            available = cash_info[0]['amount'] if cash_info else 0
-            num_buys = len(buys[:3])
+            strategy = buys[0].get('strategy', '집중')
+            report += f"💰 매수 추천 ({strategy})\n\n"
             
-            for i, buy in enumerate(buys[:3], 1):
+            available = cash_info[0]['amount'] if cash_info else 0
+            num_buys = len(buys)
+            
+            for i, buy in enumerate(buys, 1):
                 name = self.ticker_names.get(buy['ticker'], buy['ticker'])
-                if num_buys > 0:
-                    suggested_amount = available / num_buys
-                    fraction_text = f"1/{num_buys}"
-                else:
-                    suggested_amount = 0
-                    fraction_text = ""
+                suggested_amount = available / num_buys
                 
-                report += f"{i}. {buy['ticker']} ({name})\n"
-                report += f"   금액: ${suggested_amount:.0f} ({fraction_text})\n"
+                if num_buys == 1:
+                    fraction_text = "(전액)"
+                else:
+                    fraction_text = f"(1/{num_buys})"
+                
+                if num_buys > 1:
+                    report += f"{i}. "
+                
+                report += f"{buy['ticker']} ({name})\n"
+                report += f"   금액: ${suggested_amount:.0f} {fraction_text}\n"
                 report += f"   점수: {buy['score']:.1f}\n"
                 report += f"   신뢰도: {buy['confidence']}%\n\n"
         
