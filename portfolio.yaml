@@ -4,43 +4,48 @@
 tfsa1_assets:
   - name: "QQC - NASDAQ Canada"
     ticker: "QQC.TO"
+    amount: 99.13
     account: "TFSA1"
     strategy: "aggressive"
     risk_tolerance: "high"
     trading_style: "active"
-    keywords: ["QQC", "나스닥", "NASDAQ", "기술주"]
+    keywords: ["QQC", "NASDAQ", "Canada", "tech", "technology"]
   
   - name: "QQQM - NASDAQ US"
     ticker: "QQQM"
+    amount: 127.32
     account: "TFSA1"
     strategy: "aggressive"
     risk_tolerance: "high"
     trading_style: "active"
-    keywords: ["QQQM", "Invesco", "NASDAQ", "QQQ"]
+    keywords: ["QQQM", "Invesco", "NASDAQ", "QQQ", "tech"]
   
   - name: "VFV - Vanguard S&P500 CAD"
     ticker: "VFV.TO"
+    amount: 147.52
     account: "TFSA1"
     strategy: "aggressive"
     risk_tolerance: "high"
     trading_style: "active"
-    keywords: ["VFV", "Vanguard", "S&P500"]
+    keywords: ["VFV", "Vanguard", "S&P500", "SPY", "index"]
   
   - name: "VOO - Vanguard S&P500 USD"
     ticker: "VOO"
+    amount: 246.93
     account: "TFSA1"
     strategy: "aggressive"
     risk_tolerance: "high"
     trading_style: "active"
-    keywords: ["VOO", "Vanguard", "S&P 500"]
+    keywords: ["VOO", "Vanguard", "S&P 500", "SPY", "index"]
   
   - name: "XETM - Emerging Markets"
     ticker: "XETM.TO"
+    amount: 180.07
     account: "TFSA1"
     strategy: "aggressive"
     risk_tolerance: "high"
     trading_style: "active"
-    keywords: ["XETM", "신흥국", "emerging markets"]
+    keywords: ["XETM", "emerging markets", "EM", "China", "India"]
 
 # ===========================================
 # TFSA 2 - 보수적 목적별 저축
@@ -48,25 +53,193 @@ tfsa1_assets:
 tfsa2_assets:
   - name: "CASH - 여자친구 이벤트 자금"
     ticker: "CASH.TO"
+    amount: 1031.42
     account: "TFSA2"
     strategy: "conservative"
     risk_tolerance: "low"
     trading_style: "all_in_only"
-    purpose: "여친 이벤트"
+    purpose: "girlfriend events"
     withdrawal_months: [2, 5, 9, 11, 12]
     monthly_contribution: 210
-    keywords: ["CASH", "현금", "단기"]
+    keywords: ["CASH", "savings", "short-term", "liquid"]
   
   - name: "XEI - 어머님께 드릴 자금"
     ticker: "XEI.TO"
+    amount: 1525.06
     account: "TFSA2"
     strategy: "conservative"
     risk_tolerance: "low"
     trading_style: "all_in_only"
-    purpose: "어머님께 $10,000"
+    purpose: "mother's fund $10,000"
     target_amount: 10000
     monthly_contribution: 250
-    keywords: ["XEI", "배당", "dividend"]
+    keywords: ["XEI", "dividend", "income", "stable"]
+
+# ===========================================
+# 대체 자산 - 섹터 ETF
+# ===========================================
+alternative_assets:
+  # 섹터 ETF
+  - ticker: "XLE"
+    name: "Energy Sector"
+  
+  - ticker: "XLF"
+    name: "Financial Sector"
+  
+  - ticker: "XLK"
+    name: "Technology Sector"
+  
+  - ticker: "XLV"
+    name: "Healthcare Sector"
+  
+  - ticker: "XLP"
+    name: "Consumer Staples"
+  
+  - ticker: "XLY"
+    name: "Consumer Discretionary"
+  
+  - ticker: "XLI"
+    name: "Industrial Sector"
+  
+  - ticker: "XLB"
+    name: "Materials Sector"
+  
+  - ticker: "XLU"
+    name: "Utilities Sector"
+  
+  - ticker: "XLRE"
+    name: "Real Estate"
+  
+  - ticker: "XLC"
+    name: "Communication Services"
+  
+  - ticker: "VNQ"
+    name: "REIT"
+  
+  - ticker: "GLD"
+    name: "Gold"
+  
+  - ticker: "TLT"
+    name: "Long-term Treasury"
+  
+  - ticker: "HYG"
+    name: "High Yield Bonds"
+  
+  # 지수 ETF
+  - ticker: "SPY"
+    name: "S&P 500"
+  
+  - ticker: "QQQ"
+    name: "NASDAQ-100"
+  
+  - ticker: "DIA"
+    name: "Dow Jones"
+  
+  - ticker: "IWM"
+    name: "Small Cap"
+  
+  - ticker: "EEM"
+    name: "Emerging Markets"
+  
+  # 캐나다 ETF
+  - ticker: "HXQ.TO"
+    name: "NASDAQ Hedged CAD"
+  
+  - ticker: "XIU.TO"
+    name: "TSX 60"
+  
+  - ticker: "XBB.TO"
+    name: "Canadian Bonds"
+  
+  - ticker: "VDY.TO"
+    name: "Canadian Dividend"
+  
+  - ticker: "ZAG.TO"
+    name: "Canadian Aggregate Bonds"
+  
+  # 안전 개별주
+  - ticker: "MSFT"
+    name: "Microsoft"
+  
+  - ticker: "AAPL"
+    name: "Apple"
+  
+  - ticker: "BRK.B"
+    name: "Berkshire Hathaway"
+  
+  - ticker: "JNJ"
+    name: "Johnson & Johnson"
+  
+  - ticker: "PG"
+    name: "Procter & Gamble"
+  
+  - ticker: "KO"
+    name: "Coca-Cola"
+  
+  - ticker: "WMT"
+    name: "Walmart"
+  
+  - ticker: "TD.TO"
+    name: "TD Bank"
+  
+  - ticker: "RY.TO"
+    name: "Royal Bank"
+  
+  # 성장 개별주
+  - ticker: "NVDA"
+    name: "Nvidia"
+  
+  - ticker: "TSLA"
+    name: "Tesla"
+  
+  - ticker: "AMZN"
+    name: "Amazon"
+  
+  - ticker: "GOOGL"
+    name: "Google"
+  
+  - ticker: "META"
+    name: "Meta"
+
+# ===========================================
+# 안전 자산 (TFSA 2용)
+# ===========================================
+safe_assets:
+  - ticker: "ZAG.TO"
+    name: "Canadian Bonds"
+  
+  - ticker: "TLT"
+    name: "US Treasury Bonds"
+  
+  - ticker: "XBB.TO"
+    name: "Canadian Bonds Aggregate"
+  
+  - ticker: "XEI.TO"
+    name: "Canadian Dividend"
+  
+  - ticker: "VDY.TO"
+    name: "Canadian Dividend"
+  
+  - ticker: "XLU"
+    name: "Utilities Sector"
+  
+  - ticker: "JNJ"
+    name: "Johnson & Johnson"
+  
+  - ticker: "PG"
+    name: "Procter & Gamble"
+  
+  - ticker: "KO"
+    name: "Coca-Cola"
+  
+  - ticker: "TD.TO"
+    name: "TD Bank"
+  
+  - ticker: "RY.TO"
+    name: "Royal Bank"
+  
+  - ticker: "FTS.TO"
+    name: "Fortis Utilities"
 
 # ===========================================
 # 거래 규칙
@@ -159,13 +332,32 @@ emergency_triggers:
     threshold: 0.07  # ±7% 이상
     
   keywords:
-    negative: ["파산", "조사", "회계부정", "CEO 사퇴", "상장폐지", "거래정지"]
-    positive: ["인수합병", "실적 서프라이즈", "신제품 대박"]
+    negative: 
+      - "bankruptcy"
+      - "investigation"
+      - "fraud"
+      - "accounting scandal"
+      - "CEO resign"
+      - "delisting"
+      - "trading halt"
+      - "lawsuit"
+      - "recall"
+    
+    positive: 
+      - "merger"
+      - "acquisition"
+      - "earnings beat"
+      - "breakthrough"
+      - "FDA approval"
+      - "partnership"
+      - "buyback"
   
   market_events:
-    - "금리 긴급 인상"
-    - "시장 서킷브레이커"
-    - "지정학적 위기"
+    - "emergency rate hike"
+    - "circuit breaker"
+    - "geopolitical crisis"
+    - "bank failure"
+    - "market crash"
 
 # ===========================================
 # 스왑 우선순위 설정
@@ -173,14 +365,21 @@ emergency_triggers:
 swap_priority:
   tfsa1:
     sell_first:
-      - "중복 자산"  # VFV vs VOO
-      - "손실 자산"
-      - "약세 자산"
+      - "duplicate assets"  # VFV vs VOO
+      - "losing positions"
+      - "weak performers"
     
     protect:
-      - "목적 자금"
+      - "purpose funds"
   
   tfsa2:
     # 전량 교체만 가능
     protect_before_withdrawal:
       days: 14  # 출금 2주 전부터 보호
+
+# ===========================================
+# 월간 현금 유입
+# ===========================================
+monthly_cash_inflow:
+  tfsa1: 100  # TFSA 1 매달 $100
+  tfsa2: 0    # TFSA 2는 전량 교체 방식
