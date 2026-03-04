@@ -7,7 +7,7 @@ from groq import Groq
 import asyncio
 import pytz
 import yfinance as yf
-import pandas_ta as ta
+import pandas_ta_classic as ta
 from telegram import Bot
 
 class DailyDigest:
