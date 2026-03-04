@@ -26,7 +26,7 @@ class WeeklyUpdater:
         self.crypto_tickers = [
             'BTC', 'ETH', 'COIN', 'MARA', 'RIOT', 'MSTR',
             'BITF', 'HUT', 'CLSK', 'BTBT', 'SOS', 'CAN',
-            'GBTC', 'ETHE', 'BITO'
+            'GBTC', 'ETHE', 'BITO', 'BKCH', 'IREN'
         ]
         
         print(f"✅ 초기화 완료 - {self.now.strftime('%Y-%m-%d')}")
@@ -45,7 +45,7 @@ class WeeklyUpdater:
             'apiKey': self.news_api_key,
             'pageSize': 100,
             'from': from_date,
-            'q': 'stock OR market OR shares OR equity'
+            'q': 'stock OR shares OR equity OR earnings'
         }
         
         try:
@@ -60,7 +60,7 @@ class WeeklyUpdater:
         return []
     
     def extract_hot_tickers(self, news_list):
-        """뉴스에서 핫한 종목 추출"""
+        """뉴스에서 핫한 종목 추출 (crypto 제외)"""
         print("\n🔥 핫종목 추출 중...")
         
         # 뉴스 제목/설명 합치기
@@ -76,15 +76,16 @@ News summary:
 
 Rules:
 1. Extract ONLY stock tickers (e.g., AAPL, TSLA, NVDA)
-2. EXCLUDE crypto-related: {', '.join(self.crypto_tickers)}
-3. EXCLUDE if mentioned with: bitcoin, crypto, cryptocurrency, blockchain
-4. Only include if mentioned 3+ times
-5. Only US-listed stocks (no .TO, .L, etc for now)
+2. EXCLUDE ALL crypto-related tickers: {', '.join(self.crypto_tickers)}
+3. EXCLUDE any ticker mentioned with: bitcoin, crypto, cryptocurrency, blockchain, mining
+4. Only include if mentioned 3+ times in different articles
+5. Only US-listed stocks (no .TO, .L, etc)
+6. Focus on actual companies, not indexes
 
 Return ONLY JSON:
 {{
   "tickers": ["TICKER1", "TICKER2", ...],
-  "reasons": {{"TICKER1": "brief reason", ...}}
+  "reasons": {{"TICKER1": "brief reason why hot", ...}}
 }}
 
 Top 5 most mentioned non-crypto stocks only."""
@@ -146,6 +147,7 @@ Top 5 most mentioned non-crypto stocks only."""
                         'auto_added': True
                     })
                     added.append(ticker)
+                    print(f"   ➕ {ticker} 추가")
             
             # 3주 이상 뉴스 없는 자동추가 종목 제거
             cutoff_date = (self.now - timedelta(days=21)).strftime('%Y-%m-%d')
@@ -160,6 +162,7 @@ Top 5 most mentioned non-crypto stocks only."""
                         # 이번 주 뉴스에 있으면 유지
                         if asset['ticker'] not in new_tickers:
                             removed.append(asset['ticker'])
+                            print(f"   🗑️ {asset['ticker']} 제거 (3주 경과)")
                             continue
                 
                 filtered_alts.append(asset)
@@ -168,11 +171,15 @@ Top 5 most mentioned non-crypto stocks only."""
             
             # 저장
             with open('portfolio.yaml', 'w', encoding='utf-8') as f:
-                yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
+                yaml.dump(config, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
             
             print(f"✅ 업데이트 완료")
-            print(f"   추가: {', '.join(added) if added else '없음'}")
-            print(f"   제거: {', '.join(removed) if removed else '없음'}")
+            if added:
+                print(f"   추가: {', '.join(added)}")
+            if removed:
+                print(f"   제거: {', '.join(removed)}")
+            if not added and not removed:
+                print(f"   변경사항 없음")
             
             return added, removed
         
@@ -198,6 +205,8 @@ Top 5 most mentioned non-crypto stocks only."""
         
         if not hot_tickers:
             print("\n⚠️ 핫종목 없음")
+            # 그래도 오래된 것 제거는 시도
+            self.update_portfolio_yaml([], {})
             return
         
         # 3. YAML 업데이트
@@ -217,6 +226,9 @@ Top 5 most mentioned non-crypto stocks only."""
             print(f"\n❌ 제거된 종목 ({len(removed)}개):")
             for ticker in removed:
                 print(f"   🗑️ {ticker}")
+        
+        if not added and not removed:
+            print("\n✅ 변경사항 없음")
         
         print("\n✅ 완료!")
 
