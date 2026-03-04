@@ -1,0 +1,32 @@
+name: Market Close Report
+
+on:
+  schedule:
+    # 16:00 EST = 21:00 UTC (장 마감)
+    # 월-금만
+    - cron: '0 21 * * 1-5'
+  
+  workflow_dispatch:
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt --break-system-packages
+      
+      - name: Generate Market Close Report
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python market_close_report.py
