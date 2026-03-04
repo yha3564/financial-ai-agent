@@ -36,13 +36,57 @@ class DailyDigest:
         print(f"📊 추적 자산: {len(self.all_tracked_assets)}개")
         print(f"💵 누적 현금: ${self.accumulated_cash:.0f}")
     
+    def get_current_price(self, ticker):
+        """현재 주가 조회"""
+        try:
+            stock = yf.Ticker(ticker)
+            # 최근 가격 조회
+            hist = stock.history(period='1d')
+            if len(hist) > 0:
+                return hist['Close'].iloc[-1]
+            # 실패 시 info에서
+            info = stock.info
+            return info.get('currentPrice') or info.get('regularMarketPrice') or 0
+        except:
+            return 0
+    
+    def convert_old_portfolio_format(self, holdings):
+        """기존 포맷을 새 포맷으로 변환"""
+        converted = {}
+        for ticker, value in holdings.items():
+            if isinstance(value, dict):
+                # 이미 새 포맷
+                converted[ticker] = value
+            else:
+                # 기존 포맷 (숫자만) → 새 포맷으로 변환
+                current_price = self.get_current_price(ticker)
+                if current_price > 0:
+                    shares = value / current_price
+                else:
+                    shares = 0
+                
+                converted[ticker] = {
+                    'amount': value,
+                    'shares': shares,
+                    'purchase_price': current_price,
+                    'purchase_date': self.now.strftime('%Y-%m-%d')
+                }
+        return converted
+    
     def load_portfolio(self):
         """포트폴리오 로드"""
         try:
             with open('current_portfolio.json', 'r', encoding='utf-8') as f:
                 portfolio = json.load(f)
-                self.my_holdings_tfsa1 = portfolio.get('tfsa1', {})
-                self.my_holdings_tfsa2 = portfolio.get('tfsa2', {})
+                
+                # 기존 포맷 변환
+                self.my_holdings_tfsa1 = self.convert_old_portfolio_format(
+                    portfolio.get('tfsa1', {})
+                )
+                self.my_holdings_tfsa2 = self.convert_old_portfolio_format(
+                    portfolio.get('tfsa2', {})
+                )
+                
                 self.accumulated_cash = portfolio.get('accumulated_cash', 0)
                 self.last_cash_added = portfolio.get('last_cash_added', '')
                 print(f"📂 current_portfolio.json 로드")
@@ -53,11 +97,29 @@ class DailyDigest:
             
             self.my_holdings_tfsa1 = {}
             for asset in config.get('tfsa1_assets', []):
-                self.my_holdings_tfsa1[asset['ticker']] = asset['amount']
+                ticker = asset['ticker']
+                amount = asset['amount']
+                price = self.get_current_price(ticker)
+                
+                self.my_holdings_tfsa1[ticker] = {
+                    'amount': amount,
+                    'shares': amount / price if price > 0 else 0,
+                    'purchase_price': price,
+                    'purchase_date': self.now.strftime('%Y-%m-%d')
+                }
             
             self.my_holdings_tfsa2 = {}
             for asset in config.get('tfsa2_assets', []):
-                self.my_holdings_tfsa2[asset['ticker']] = asset['amount']
+                ticker = asset['ticker']
+                amount = asset['amount']
+                price = self.get_current_price(ticker)
+                
+                self.my_holdings_tfsa2[ticker] = {
+                    'amount': amount,
+                    'shares': amount / price if price > 0 else 0,
+                    'purchase_price': price,
+                    'purchase_date': self.now.strftime('%Y-%m-%d')
+                }
             
             # 첫 실행 시 초기 현금 설정
             monthly_cash_config = config.get('monthly_cash_inflow', {})
@@ -142,6 +204,16 @@ class DailyDigest:
             json.dump(portfolio_data, f, indent=2)
         
         print(f"💾 포트폴리오 업데이트 완료")
+    
+    def calculate_current_value(self, ticker, holding_info):
+        """현재 가치 계산"""
+        if isinstance(holding_info, dict):
+            shares = holding_info.get('shares', 0)
+            current_price = self.get_current_price(ticker)
+            return shares * current_price if current_price > 0 else holding_info.get('amount', 0)
+        else:
+            # 기존 포맷 (숫자만)
+            return holding_info
     
     def collect_all_news(self):
         """전체 금융 뉴스 수집"""
@@ -402,32 +474,35 @@ Be concise. Only include assets with significant impact."""
         }
     
     def generate_tfsa1_recommendations(self, my_ranks, all_rankings):
-        """TFSA 1 추천 (AI 판단: 집중 vs 분산, 매월 1일 무조건 투자)"""
+        """TFSA 1 추천 (AI 판단: 집중 vs 분산, 첫 실행/매월 1일 무조건 투자)"""
         available_cash = self.accumulated_cash
         actions = []
         
         # 매도: 점수 -2 이하만
         for ticker, rank in my_ranks.items():
             if rank['weighted_score'] < -2:
-                amount = self.my_holdings_tfsa1[ticker]
-                available_cash += amount
+                holding = self.my_holdings_tfsa1[ticker]
+                current_value = self.calculate_current_value(ticker, holding)
+                available_cash += current_value
                 actions.append({
                     'action': 'SELL',
                     'ticker': ticker,
-                    'amount': amount,
+                    'amount': current_value,
                     'score': rank['weighted_score'],
                     'reason': rank['technical']['reason']
                 })
         
         # 매수 로직 (AI 판단)
         if available_cash > 0:
-            # 매월 1일: 점수 무시하고 무조건 투자!
+            # 무조건 투자 조건: 매월 1일 OR 포트폴리오 비어있음
             is_first_day = self.now.day == 1
+            is_empty_portfolio = len(self.my_holdings_tfsa1) == 0
             
-            if is_first_day:
-                # 1일: TOP 자산들 (점수 무시)
+            if is_first_day or is_empty_portfolio:
+                # 무조건 투자 (점수 무시)
                 top_assets = [r for r in all_rankings[:10] 
                              if r['ticker'] not in self.my_holdings_tfsa1]
+                print(f"   💡 무조건 투자 모드 (1일: {is_first_day}, 빈 포트폴리오: {is_empty_portfolio})")
             else:
                 # 평일: 점수 +2 이상만
                 top_assets = [r for r in all_rankings[:10] 
@@ -476,9 +551,11 @@ Be concise. Only include assets with significant impact."""
         if available_cash > self.accumulated_cash:
             cash_source.append("매도금")
         
-        # 매월 1일이면 표시
+        # 무조건 투자 모드면 표시
         if self.now.day == 1 and self.accumulated_cash > 0:
             cash_source.append("(1일 즉시 투자)")
+        elif len(self.my_holdings_tfsa1) == 0 and self.accumulated_cash > 0:
+            cash_source.append("(첫 투자)")
         
         actions.append({
             'action': 'CASH_AVAILABLE',
@@ -533,7 +610,8 @@ Be concise. Only include assets with significant impact."""
         # 매도 처리
         for sell in sells:
             if sell['ticker'] in self.my_holdings_tfsa1:
-                amount = self.my_holdings_tfsa1[sell['ticker']]
+                holding = self.my_holdings_tfsa1[sell['ticker']]
+                amount = self.calculate_current_value(sell['ticker'], holding)
                 del self.my_holdings_tfsa1[sell['ticker']]
                 self.accumulated_cash += amount
                 print(f"   ✅ TFSA1에서 {sell['ticker']} 제거 (+${amount:.0f})")
@@ -547,11 +625,25 @@ Be concise. Only include assets with significant impact."""
             # 균등 분할
             for buy in buys:
                 amount = available / num_buys
-                self.my_holdings_tfsa1[buy['ticker']] = amount
+                ticker = buy['ticker']
+                current_price = self.get_current_price(ticker)
+                
+                if current_price > 0:
+                    shares = amount / current_price
+                else:
+                    shares = 0
+                
+                self.my_holdings_tfsa1[ticker] = {
+                    'amount': amount,
+                    'shares': shares,
+                    'purchase_price': current_price,
+                    'purchase_date': self.now.strftime('%Y-%m-%d')
+                }
+                
                 self.accumulated_cash -= amount
                 
                 strategy = buy.get('strategy', '집중')
-                print(f"   ✅ TFSA1에 {buy['ticker']} ${amount:.0f} 추가 ({strategy})")
+                print(f"   ✅ TFSA1에 {ticker} ${amount:.0f} 추가 ({shares:.4f}주, {strategy})")
                 updated = True
         
         # TFSA 2 처리
@@ -559,13 +651,28 @@ Be concise. Only include assets with significant impact."""
             if rec['action'] == 'SWITCH':
                 # 기존 자산 제거
                 if rec['from'] in self.my_holdings_tfsa2:
-                    amount = self.my_holdings_tfsa2[rec['from']]
+                    holding = self.my_holdings_tfsa2[rec['from']]
+                    amount = self.calculate_current_value(rec['from'], holding)
                     del self.my_holdings_tfsa2[rec['from']]
                     print(f"   ✅ TFSA2에서 {rec['from']} 제거")
                     
                     # 새 자산 추가
-                    self.my_holdings_tfsa2[rec['to']] = amount
-                    print(f"   ✅ TFSA2에 {rec['to']} ${amount:.0f} 추가")
+                    ticker = rec['to']
+                    current_price = self.get_current_price(ticker)
+                    
+                    if current_price > 0:
+                        shares = amount / current_price
+                    else:
+                        shares = 0
+                    
+                    self.my_holdings_tfsa2[ticker] = {
+                        'amount': amount,
+                        'shares': shares,
+                        'purchase_price': current_price,
+                        'purchase_date': self.now.strftime('%Y-%m-%d')
+                    }
+                    
+                    print(f"   ✅ TFSA2에 {ticker} ${amount:.0f} 추가 ({shares:.4f}주)")
                     updated = True
         
         # 파일 저장
@@ -585,6 +692,25 @@ Be concise. Only include assets with significant impact."""
         report = f"📊 일일 브리핑\n"
         report += f"🕐 {self.now.strftime('%Y-%m-%d %H:%M %Z')}\n"
         report += "="*37 + "\n\n"
+        
+        # 현재 포트폴리오 가치 표시
+        if self.my_holdings_tfsa1:
+            report += "💼 TFSA 1 현재 보유\n\n"
+            for ticker, holding in self.my_holdings_tfsa1.items():
+                name = self.ticker_names.get(ticker, ticker)
+                current_value = self.calculate_current_value(ticker, holding)
+                purchase_amount = holding.get('amount', 0) if isinstance(holding, dict) else holding
+                
+                if purchase_amount > 0:
+                    profit_pct = ((current_value - purchase_amount) / purchase_amount) * 100
+                    profit_text = f"{profit_pct:+.1f}%"
+                else:
+                    profit_text = "N/A"
+                
+                report += f"{ticker} ({name})\n"
+                report += f"현재: ${current_value:.0f} ({profit_text})\n\n"
+            
+            report += "="*37 + "\n\n"
         
         tfsa1 = recommendations['tfsa1']
         sells = [a for a in tfsa1 if a['action'] == 'SELL']
@@ -629,14 +755,16 @@ Be concise. Only include assets with significant impact."""
         
         tfsa2 = recommendations['tfsa2']
         if tfsa2:
-            if sells or buys:
+            if sells or buys or self.my_holdings_tfsa1:
                 report += "="*37 + "\n\n"
             
             report += "💰 TFSA 2 전환\n\n"
             for rec in tfsa2:
                 from_name = self.ticker_names.get(rec['from'], rec['from'])
                 to_name = self.ticker_names.get(rec['to'], rec['to'])
-                from_amount = self.my_holdings_tfsa2.get(rec['from'], 0)
+                
+                from_holding = self.my_holdings_tfsa2.get(rec['from'], 0)
+                from_amount = self.calculate_current_value(rec['from'], from_holding)
                 
                 report += f"매도: {rec['from']} ({from_name})\n"
                 report += f"금액: ${from_amount:.0f} (전량)\n\n"
@@ -645,7 +773,7 @@ Be concise. Only include assets with significant impact."""
                 report += f"점수: {rec['score']:.1f}\n"
                 report += f"{rec['reason']}\n\n"
         
-        if not sells and not buys and not tfsa2:
+        if not sells and not buys and not tfsa2 and not self.my_holdings_tfsa1:
             report += "✅ 오늘은 특별한 변경사항이 없습니다.\n"
         
         return report
