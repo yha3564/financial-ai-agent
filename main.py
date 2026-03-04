@@ -11,38 +11,28 @@ import pandas_ta_classic as ta
 from telegram import Bot
 
 class DailyDigest:
-    """
-    아침 종합 브리핑 (v3.0)
-    전체 뉴스 수집 → AI 영향 분석 → 기술적 분석 → 순위표 → 구체적 추천
-    """
+    """아침 종합 브리핑 v3.0 완전판"""
     
     def __init__(self):
         print("🚀 Daily Digest v3.0 초기화...")
         
-        # API 키
         self.news_api_key = os.environ['NEWS_API_KEY']
         self.groq_api_key = os.environ['GROQ_API_KEY']
         self.telegram_token = os.environ['TELEGRAM_BOT_TOKEN']
         self.telegram_chat_id = os.environ['TELEGRAM_CHAT_ID']
         
-        # Groq 클라이언트
         self.groq = Groq(api_key=self.groq_api_key)
-        
-        # 시간대
         self.est = pytz.timezone('America/New_York')
         self.now = datetime.now(self.est)
         
-        # 포트폴리오 로드
         self.load_portfolio()
-        
-        # 모든 추적 자산
         self.all_tracked_assets = self.build_all_assets_list()
         
         print(f"✅ 초기화 완료 - {self.now.strftime('%Y-%m-%d %H:%M %Z')}")
         print(f"📊 추적 자산: {len(self.all_tracked_assets)}개")
     
     def load_portfolio(self):
-        """현재 포트폴리오 로드"""
+        """포트폴리오 로드"""
         try:
             with open('current_portfolio.json', 'r', encoding='utf-8') as f:
                 portfolio = json.load(f)
@@ -73,9 +63,11 @@ class DailyDigest:
         self.alternative_assets = [alt['ticker'] for alt in config.get('alternative_assets', [])]
         self.safe_assets = [safe['ticker'] for safe in config.get('safe_assets', [])]
         self.cost_settings = config.get('cost_settings', {})
+        self.monthly_cash = config.get('monthly_cash_inflow', {})
         
         print(f"💼 TFSA 1: {list(self.my_holdings_tfsa1.keys())}")
         print(f"💰 TFSA 2: {list(self.my_holdings_tfsa2.keys())}")
+        print(f"💵 월간 현금: TFSA1 ${self.monthly_cash.get('tfsa1', 0)}")
     
     def build_all_assets_list(self):
         """분석할 모든 자산"""
@@ -97,21 +89,21 @@ class DailyDigest:
         print(f"💾 포트폴리오 업데이트 완료")
     
     def collect_all_news(self):
-    """전체 금융 뉴스 수집"""
-    print("\n📰 전체 뉴스 수집 중...")
-    
-    all_news = []
-    categories = ['business', 'technology']
-    
-    for category in categories:
-        url = "https://newsapi.org/v2/top-headlines"
-        params = {
-            'language': 'en',
-            'apiKey': self.news_api_key,
-            'pageSize': 100,
-            'category': category,
-            'country': 'us'
-        }
+        """전체 금융 뉴스 수집"""
+        print("\n📰 전체 뉴스 수집 중...")
+        
+        all_news = []
+        categories = ['business', 'technology']
+        
+        for category in categories:
+            url = "https://newsapi.org/v2/top-headlines"
+            params = {
+                'language': 'en',
+                'apiKey': self.news_api_key,
+                'pageSize': 100,
+                'category': category,
+                'country': 'us'
+            }
             
             try:
                 response = requests.get(url, params=params, timeout=10)
@@ -127,7 +119,6 @@ class DailyDigest:
     
     def analyze_news_impact(self, news_item):
         """각 뉴스가 모든 자산에 미치는 영향 분석"""
-        
         assets_str = ", ".join(self.all_tracked_assets)
         
         prompt = f"""News: {news_item['title']}
@@ -212,13 +203,13 @@ Be concise. Only include assets with significant impact."""
         return results
     
     def technical_analysis(self, ticker):
-        """기술적 분석"""
+        """기술적 분석 (완전판)"""
         try:
             stock = yf.Ticker(ticker)
             df = stock.history(period='60d')
             
             if len(df) < 20:
-                return {'signal': 'neutral', 'reason': 'Insufficient data'}
+                return {'signal': 'neutral', 'reason': 'Insufficient data', 'rsi': 50}
             
             df['rsi'] = ta.rsi(df['Close'], length=14)
             current_rsi = df['rsi'].iloc[-1]
@@ -279,7 +270,6 @@ Be concise. Only include assets with significant impact."""
     def calculate_net_return(self, expected_return, ticker):
         """환전 비용 포함 순수익 계산"""
         fx_fee = self.cost_settings.get('fx_fee', 0.015)
-        
         is_usd = not ticker.endswith('.TO')
         
         if is_usd:
@@ -293,7 +283,7 @@ Be concise. Only include assets with significant impact."""
         return net_return
     
     def create_rankings(self, asset_impacts):
-        """순위표 생성"""
+        """순위표 생성 (완전판)"""
         print("\n📊 순위표 생성 중...")
         
         rankings = []
@@ -314,7 +304,6 @@ Be concise. Only include assets with significant impact."""
                 adjusted_expected *= 0.7
             
             net_return = self.calculate_net_return(adjusted_expected, ticker)
-            
             weighted_score = net_return * (confidence / 100)
             
             rankings.append({
@@ -351,35 +340,45 @@ Be concise. Only include assets with significant impact."""
         }
     
     def generate_tfsa1_recommendations(self, my_ranks, all_rankings):
-        """TFSA 1 추천"""
+        """TFSA 1 추천 (현금 유입 고려)"""
+        monthly_cash = self.monthly_cash.get('tfsa1', 0)
+        available_cash = monthly_cash
         actions = []
         
         for ticker, rank in my_ranks.items():
-            if rank['weighted_score'] < -2:
+            if rank['weighted_score'] < -5:
                 amount = self.my_holdings_tfsa1[ticker]
+                available_cash += amount
                 actions.append({
                     'action': 'SELL',
                     'ticker': ticker,
                     'amount': amount,
-                    'reason': f"Weighted score: {rank['weighted_score']:.1f}",
-                    'urgency': 'HIGH'
+                    'score': rank['weighted_score'],
+                    'reason': rank['technical']['reason']
                 })
         
-        top_assets = [r for r in all_rankings[:5] if r['weighted_score'] > 5]
+        if available_cash > 0:
+            top_assets = [r for r in all_rankings[:5] if r['weighted_score'] > 5]
+            
+            for asset in top_assets[:3]:
+                if asset['ticker'] not in self.my_holdings_tfsa1:
+                    actions.append({
+                        'action': 'BUY',
+                        'ticker': asset['ticker'],
+                        'score': asset['weighted_score'],
+                        'confidence': asset['confidence']
+                    })
         
-        for asset in top_assets:
-            if asset['ticker'] not in self.my_holdings_tfsa1:
-                actions.append({
-                    'action': 'BUY',
-                    'ticker': asset['ticker'],
-                    'score': asset['weighted_score'],
-                    'reason': f"Expected: +{asset['net_return']*100:.1f}%, Confidence: {asset['confidence']}%"
-                })
+        actions.append({
+            'action': 'CASH_AVAILABLE',
+            'amount': available_cash,
+            'source': f"${monthly_cash} 현금" + (" + 매도금" if available_cash > monthly_cash else "")
+        })
         
         return actions
     
     def generate_tfsa2_recommendations(self, my_ranks, all_rankings):
-        """TFSA 2 추천"""
+        """TFSA 2 추천 (전량 교체, CASH 제외)"""
         safe_rankings = [r for r in all_rankings if r['ticker'] in self.safe_assets]
         safe_rankings.sort(key=lambda x: x['weighted_score'], reverse=True)
         
@@ -387,14 +386,18 @@ Be concise. Only include assets with significant impact."""
             return []
         
         best_safe = safe_rankings[0]
-        current = list(self.my_holdings_tfsa2.keys())[0] if self.my_holdings_tfsa2 else None
         
-        if current and current != best_safe['ticker']:
+        current_tickers = list(self.my_holdings_tfsa2.keys())
+        current_investments = [t for t in current_tickers if t != 'CASH.TO']
+        
+        if current_investments and current_investments[0] != best_safe['ticker']:
+            current = current_investments[0]
             return [{
                 'action': 'SWITCH',
                 'from': current,
                 'to': best_safe['ticker'],
-                'reason': f"Better safe asset: +{best_safe['net_return']*100:.1f}%"
+                'score': best_safe['weighted_score'],
+                'reason': f"+{best_safe['net_return']*100:.1f}% expected"
             }]
         
         return []
@@ -409,27 +412,35 @@ Be concise. Only include assets with significant impact."""
         if tfsa1:
             sells = [a for a in tfsa1 if a['action'] == 'SELL']
             buys = [a for a in tfsa1 if a['action'] == 'BUY']
+            cash_info = [a for a in tfsa1 if a['action'] == 'CASH_AVAILABLE']
             
             if sells:
                 report += "🚨 TFSA 1 매도\n\n"
                 for sell in sells:
                     report += f"매도: {sell['ticker']} ${sell['amount']:.0f}\n"
-                    report += f"이유: {sell['reason']}\n\n"
+                    report += f"점수: {sell['score']:.1f}\n"
+                    report += f"기술: {sell['reason']}\n\n"
+            
+            if cash_info:
+                report += f"💵 사용 가능: ${cash_info[0]['amount']:.0f}\n"
+                report += f"({cash_info[0]['source']})\n\n"
             
             if buys:
-                report += "💰 TFSA 1 매수\n\n"
-                for buy in buys[:3]:
-                    report += f"매수: {buy['ticker']}\n"
-                    report += f"이유: {buy['reason']}\n\n"
+                report += "💰 매수 추천 (TOP 3)\n\n"
+                for i, buy in enumerate(buys[:3], 1):
+                    report += f"{i}. {buy['ticker']}\n"
+                    report += f"   점수: {buy['score']:.1f}\n"
+                    report += f"   신뢰도: {buy['confidence']}%\n\n"
         
         tfsa2 = recommendations['tfsa2']
         if tfsa2:
             report += "💰 TFSA 2 전환\n\n"
             for rec in tfsa2:
-                report += f"전환: {rec['from']} → {rec['to']}\n"
-                report += f"이유: {rec['reason']}\n\n"
+                report += f"{rec['from']} → {rec['to']}\n"
+                report += f"점수: {rec['score']:.1f}\n"
+                report += f"{rec['reason']}\n\n"
         
-        if not tfsa1 and not tfsa2:
+        if not sells and not tfsa2:
             report += "✅ 오늘은 특별한 변경사항이 없습니다.\n"
         
         return report
