@@ -430,70 +430,69 @@ Be concise. Only include assets with significant impact."""
         return []
     
     def format_telegram_report(self, recommendations):
-    """텔레그램 리포트 생성"""
-    report = f"📊 일일 브리핑\n"
-    report += f"🕐 {self.now.strftime('%Y-%m-%d %H:%M %Z')}\n"
-    report += "===\n\n"
-    
-    tfsa1 = recommendations['tfsa1']
-    sells = [a for a in tfsa1 if a['action'] == 'SELL']
-    buys = [a for a in tfsa1 if a['action'] == 'BUY']
-    cash_info = [a for a in tfsa1 if a['action'] == 'CASH_AVAILABLE']
-    
-    if sells:
-        report += "🚨 TFSA 1 매도\n\n"
-        for sell in sells:
-            name = self.ticker_names.get(sell['ticker'], sell['ticker'])
-            report += f"매도: {sell['ticker']} ({name})\n"
-            report += f"금액: ${sell['amount']:.0f}\n"
-            report += f"점수: {sell['score']:.1f}\n"
-            report += f"기술: {sell['reason']}\n\n"
-    
-    if cash_info:
-        report += f"💵 사용 가능: ${cash_info[0]['amount']:.0f}\n"
-        report += f"({cash_info[0]['source']})\n\n"
-    
-    if buys:
-        report += "💰 매수 추천 (TOP 3)\n\n"
+        """텔레그램 리포트 생성"""
+        report = f"📊 일일 브리핑\n"
+        report += f"🕐 {self.now.strftime('%Y-%m-%d %H:%M %Z')}\n"
+        report += "===\n\n"
         
-        # 사용 가능 현금
-        available = cash_info[0]['amount'] if cash_info else 0
-        num_buys = len(buys[:3])
+        tfsa1 = recommendations['tfsa1']
+        sells = [a for a in tfsa1 if a['action'] == 'SELL']
+        buys = [a for a in tfsa1 if a['action'] == 'BUY']
+        cash_info = [a for a in tfsa1 if a['action'] == 'CASH_AVAILABLE']
         
-        for i, buy in enumerate(buys[:3], 1):
-            name = self.ticker_names.get(buy['ticker'], buy['ticker'])
+        if sells:
+            report += "🚨 TFSA 1 매도\n\n"
+            for sell in sells:
+                name = self.ticker_names.get(sell['ticker'], sell['ticker'])
+                report += f"매도: {sell['ticker']} ({name})\n"
+                report += f"금액: ${sell['amount']:.0f}\n\n"
+            report += "===\n\n"
+        
+        if cash_info:
+            report += f"💵 사용 가능: ${cash_info[0]['amount']:.0f}\n"
+            report += f"({cash_info[0]['source']})\n\n"
+        
+        if buys:
+            report += "💰 매수 추천\n\n"
+            available = cash_info[0]['amount'] if cash_info else 0
+            num_buys = len(buys[:3])
             
-            # 추천 금액 계산
-            if num_buys > 0:
-                suggested_amount = available / num_buys
-            else:
-                suggested_amount = 0
+            for i, buy in enumerate(buys[:3], 1):
+                name = self.ticker_names.get(buy['ticker'], buy['ticker'])
+                if num_buys > 0:
+                    suggested_amount = available / num_buys
+                    fraction_text = f"1/{num_buys}"
+                else:
+                    suggested_amount = 0
+                    fraction_text = ""
+                
+                report += f"{i}. {buy['ticker']} ({name})\n"
+                report += f"   금액: ${suggested_amount:.0f} ({fraction_text})\n"
+                report += f"   점수: {buy['score']:.1f}\n"
+                report += f"   신뢰도: {buy['confidence']}%\n\n"
+        
+        tfsa2 = recommendations['tfsa2']
+        if tfsa2:
+            if sells or buys:
+                report += "===\n\n"
             
-            report += f"{i}. {buy['ticker']} ({name})\n"
-            report += f"   추천 금액: ${suggested_amount:.0f}\n"
-            report += f"   점수: {buy['score']:.1f}\n"
-            report += f"   신뢰도: {buy['confidence']}%\n\n"
-    
-    tfsa2 = recommendations['tfsa2']
-    if tfsa2:
-        report += "💰 TFSA 2 전환\n\n"
-        for rec in tfsa2:
-            from_name = self.ticker_names.get(rec['from'], rec['from'])
-            to_name = self.ticker_names.get(rec['to'], rec['to'])
-            
-            # 현재 보유 금액
-            from_amount = self.my_holdings_tfsa2.get(rec['from'], 0)
-            
-            report += f"매도: {rec['from']} ({from_name})\n"
-            report += f"금액: ${from_amount:.0f} (전량)\n\n"
-            report += f"매수: {rec['to']} ({to_name})\n"
-            report += f"점수: {rec['score']:.1f}\n"
-            report += f"{rec['reason']}\n\n"
-    
-    if not sells and not tfsa2:
-        report += "✅ 오늘은 특별한 변경사항이 없습니다.\n"
-    
-    return report
+            report += "💰 TFSA 2 전환\n\n"
+            for rec in tfsa2:
+                from_name = self.ticker_names.get(rec['from'], rec['from'])
+                to_name = self.ticker_names.get(rec['to'], rec['to'])
+                from_amount = self.my_holdings_tfsa2.get(rec['from'], 0)
+                
+                report += f"매도: {rec['from']} ({from_name})\n"
+                report += f"금액: ${from_amount:.0f} (전량)\n\n"
+                report += f"매수: {rec['to']} ({to_name})\n"
+                report += f"금액: ${from_amount:.0f} (전량)\n"
+                report += f"점수: {rec['score']:.1f}\n"
+                report += f"{rec['reason']}\n\n"
+        
+        if not sells and not buys and not tfsa2:
+            report += "✅ 오늘은 특별한 변경사항이 없습니다.\n"
+        
+        return report
     
     async def send_telegram(self, message):
         """텔레그램 전송"""
