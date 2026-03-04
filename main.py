@@ -97,25 +97,21 @@ class DailyDigest:
         print(f"💾 포트폴리오 업데이트 완료")
     
     def collect_all_news(self):
-        """전체 금융 뉴스 수집"""
-        print("\n📰 전체 뉴스 수집 중...")
-        
-        cutoff_time = self.now - timedelta(hours=16.5)
-        from_date = cutoff_time.strftime('%Y-%m-%dT%H:%M:%S')
-        
-        all_news = []
-        categories = ['business', 'technology']
-        
-        for category in categories:
-            url = "https://newsapi.org/v2/everything"
-            params = {
-                'language': 'en',
-                'sortBy': 'publishedAt',
-                'apiKey': self.news_api_key,
-                'pageSize': 100,
-                'from': from_date,
-                'q': 'stock OR market OR fed OR economy'
-            }
+    """전체 금융 뉴스 수집"""
+    print("\n📰 전체 뉴스 수집 중...")
+    
+    all_news = []
+    categories = ['business', 'technology']
+    
+    for category in categories:
+        url = "https://newsapi.org/v2/top-headlines"
+        params = {
+            'language': 'en',
+            'apiKey': self.news_api_key,
+            'pageSize': 100,
+            'category': category,
+            'country': 'us'
+        }
             
             try:
                 response = requests.get(url, params=params, timeout=10)
