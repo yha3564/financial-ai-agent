@@ -29,8 +29,12 @@ class DailyDigest:
         self.all_tracked_assets = self.build_all_assets_list()
         self.build_ticker_name_map()
         
+        # 매월 1일 현금 입금 체크
+        self.check_monthly_cash()
+        
         print(f"✅ 초기화 완료 - {self.now.strftime('%Y-%m-%d %H:%M %Z')}")
         print(f"📊 추적 자산: {len(self.all_tracked_assets)}개")
+        print(f"💵 누적 현금: ${self.accumulated_cash:.0f}")
     
     def load_portfolio(self):
         """포트폴리오 로드"""
@@ -39,6 +43,8 @@ class DailyDigest:
                 portfolio = json.load(f)
                 self.my_holdings_tfsa1 = portfolio.get('tfsa1', {})
                 self.my_holdings_tfsa2 = portfolio.get('tfsa2', {})
+                self.accumulated_cash = portfolio.get('accumulated_cash', 0)
+                self.last_cash_added = portfolio.get('last_cash_added', '')
                 print(f"📂 current_portfolio.json 로드")
         except FileNotFoundError:
             print(f"📂 portfolio.yaml에서 초기화...")
@@ -53,9 +59,14 @@ class DailyDigest:
             for asset in config.get('tfsa2_assets', []):
                 self.my_holdings_tfsa2[asset['ticker']] = asset['amount']
             
+            self.accumulated_cash = 0
+            self.last_cash_added = ''
+            
             self.save_portfolio({
                 'tfsa1': self.my_holdings_tfsa1,
-                'tfsa2': self.my_holdings_tfsa2
+                'tfsa2': self.my_holdings_tfsa2,
+                'accumulated_cash': self.accumulated_cash,
+                'last_cash_added': self.last_cash_added
             })
         
         with open('portfolio.yaml', 'r', encoding='utf-8') as f:
@@ -68,7 +79,27 @@ class DailyDigest:
         
         print(f"💼 TFSA 1: {list(self.my_holdings_tfsa1.keys())}")
         print(f"💰 TFSA 2: {list(self.my_holdings_tfsa2.keys())}")
-        print(f"💵 월간 현금: TFSA1 ${self.monthly_cash.get('tfsa1', 0)}")
+    
+    def check_monthly_cash(self):
+        """매월 1일 현금 입금 체크"""
+        today = self.now.strftime('%Y-%m-%d')
+        
+        # 오늘이 1일인가?
+        if self.now.day == 1:
+            # 이미 이번 달에 추가했는가?
+            if self.last_cash_added != today:
+                monthly_amount = self.monthly_cash.get('tfsa1', 0)
+                self.accumulated_cash += monthly_amount
+                self.last_cash_added = today
+                print(f"💵 월간 현금 입금: +${monthly_amount} (총: ${self.accumulated_cash:.0f})")
+                
+                # 즉시 저장
+                self.save_portfolio({
+                    'tfsa1': self.my_holdings_tfsa1,
+                    'tfsa2': self.my_holdings_tfsa2,
+                    'accumulated_cash': self.accumulated_cash,
+                    'last_cash_added': self.last_cash_added
+                })
     
     def build_all_assets_list(self):
         """분석할 모든 자산"""
@@ -367,9 +398,8 @@ Be concise. Only include assets with significant impact."""
         }
     
     def generate_tfsa1_recommendations(self, my_ranks, all_rankings):
-        """TFSA 1 추천 (현금 유입 고려, 점수 필터 ±2)"""
-        monthly_cash = self.monthly_cash.get('tfsa1', 0)
-        available_cash = monthly_cash
+        """TFSA 1 추천 (누적 현금 사용, 점수 필터 ±2)"""
+        available_cash = self.accumulated_cash
         actions = []
         
         # 매도: 점수 -2 이하만
@@ -399,10 +429,16 @@ Be concise. Only include assets with significant impact."""
                     })
         
         # 현금 정보 (항상 표시)
+        cash_source = []
+        if self.accumulated_cash > 0:
+            cash_source.append(f"${self.accumulated_cash:.0f} 누적")
+        if available_cash > self.accumulated_cash:
+            cash_source.append("매도금")
+        
         actions.append({
             'action': 'CASH_AVAILABLE',
             'amount': available_cash,
-            'source': f"${monthly_cash} 현금" + (" + 매도금" if available_cash > monthly_cash else "")
+            'source': " + ".join(cash_source) if cash_source else "$0"
         })
         
         return actions
@@ -452,8 +488,10 @@ Be concise. Only include assets with significant impact."""
         # 매도 처리
         for sell in sells:
             if sell['ticker'] in self.my_holdings_tfsa1:
+                amount = self.my_holdings_tfsa1[sell['ticker']]
                 del self.my_holdings_tfsa1[sell['ticker']]
-                print(f"   ✅ TFSA1에서 {sell['ticker']} 제거")
+                self.accumulated_cash += amount
+                print(f"   ✅ TFSA1에서 {sell['ticker']} 제거 (+${amount:.0f})")
                 updated = True
         
         # 매수 처리
@@ -464,7 +502,8 @@ Be concise. Only include assets with significant impact."""
             for buy in buys[:3]:
                 amount = available / num_buys
                 self.my_holdings_tfsa1[buy['ticker']] = amount
-                print(f"   ✅ TFSA1에 {buy['ticker']} ${amount:.0f} 추가")
+                self.accumulated_cash -= amount
+                print(f"   ✅ TFSA1에 {buy['ticker']} ${amount:.0f} 추가 (-${amount:.0f})")
                 updated = True
         
         # TFSA 2 처리
@@ -482,12 +521,14 @@ Be concise. Only include assets with significant impact."""
                     updated = True
         
         # 파일 저장
-        if updated:
+        if updated or sells or buys:  # 현금 변동도 저장
             self.save_portfolio({
                 'tfsa1': self.my_holdings_tfsa1,
-                'tfsa2': self.my_holdings_tfsa2
+                'tfsa2': self.my_holdings_tfsa2,
+                'accumulated_cash': self.accumulated_cash,
+                'last_cash_added': self.last_cash_added
             })
-            print("✅ 포트폴리오 업데이트 완료!")
+            print(f"✅ 포트폴리오 업데이트 완료! (누적 현금: ${self.accumulated_cash:.0f})")
         else:
             print("✅ 변경사항 없음")
     
