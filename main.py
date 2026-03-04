@@ -414,7 +414,7 @@ Be concise. Only include assets with significant impact."""
         """텔레그램 리포트 생성"""
         report = f"📊 일일 브리핑\n"
         report += f"🕐 {self.now.strftime('%Y-%m-%d %H:%M %Z')}\n"
-        report += "="*40 + "\n\n"
+        report += "="*37 + "\n\n"
         
         tfsa1 = recommendations['tfsa1']
         if tfsa1:
