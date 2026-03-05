@@ -427,6 +427,7 @@ def submit_trades():
 
         # 매도 처리 (체결가 기준)
         sell_total = 0
+        sold_history = []
         for sell in sells:
             ticker = sell['ticker']
             sell_price = prices.get(f'sell_tfsa1_{ticker}', 0)
@@ -435,7 +436,21 @@ def submit_trades():
 
             existing = portfolio.get('tfsa1', {}).get(ticker, {})
             old_shares = existing.get('shares', 0)
+            avg_price = existing.get('avg_price', 0)
             remaining = round(old_shares - sell_shares, 4)
+
+            # 실현 손익 기록
+            sold_history.append({
+                'ticker': ticker,
+                'shares': sell_shares,
+                'avg_price': avg_price,
+                'sell_price': sell_price,
+                'sell_value': round(sell_price * sell_shares, 2),
+                'profit': round((sell_price - avg_price) * sell_shares, 2),
+                'profit_pct': round((sell_price - avg_price) / avg_price * 100, 2) if avg_price > 0 else 0,
+                'type': sell.get('type', 'full'),
+                'account': 'TFSA1'
+            })
 
             if remaining <= 0 or sell['type'] == 'full':
                 if ticker in portfolio.get('tfsa1', {}):
@@ -476,10 +491,27 @@ def submit_trades():
             actions = data.get('actions', [])
             sell_actions = [a for a in actions if a['action'] == 'SELL']
             buy_actions = [a for a in actions if a['action'] == 'BUY']
-
             purpose_info = {}
+
             for sell in sell_actions:
                 ticker = sell['ticker']
+                existing = portfolio.get('tfsa2', {}).get(ticker, {})
+                avg_price = existing.get('avg_price', 0)
+                sell_price = prices.get(f'sell_tfsa2_{holder_ticker}_{ticker}', 0)
+                sell_shares = sell['shares']
+
+                sold_history.append({
+                    'ticker': ticker,
+                    'shares': sell_shares,
+                    'avg_price': avg_price,
+                    'sell_price': sell_price,
+                    'sell_value': round(sell_price * sell_shares, 2),
+                    'profit': round((sell_price - avg_price) * sell_shares, 2),
+                    'profit_pct': round((sell_price - avg_price) / avg_price * 100, 2) if avg_price > 0 else 0,
+                    'type': sell.get('type', 'full'),
+                    'account': 'TFSA2'
+                })
+
                 if ticker in portfolio.get('tfsa2', {}):
                     purpose_info = {
                         k: v for k, v in portfolio['tfsa2'][ticker].items()
@@ -517,6 +549,19 @@ def submit_trades():
         # 저장
         with open('current_portfolio.json', 'w') as f:
             json.dump(portfolio, f, indent=2, ensure_ascii=False)
+
+        # 오늘 매도 실현손익 저장
+        if sold_history:
+            try:
+                with open('today_sold.json', 'r') as f:
+                    existing_sold = json.load(f)
+                if existing_sold.get('date') != now.strftime('%Y-%m-%d'):
+                    existing_sold = {'date': now.strftime('%Y-%m-%d'), 'sells': []}
+            except FileNotFoundError:
+                existing_sold = {'date': now.strftime('%Y-%m-%d'), 'sells': []}
+            existing_sold['sells'].extend(sold_history)
+            with open('today_sold.json', 'w') as f:
+                json.dump(existing_sold, f, indent=2, ensure_ascii=False)
 
         # GitHub push
         push_result = push_to_github()
