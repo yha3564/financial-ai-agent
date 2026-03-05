@@ -140,7 +140,7 @@ class MarketCloseReport:
     # 리포트 생성
     # --------------------------------------------------------
     def generate_report(self):
-        report = f"📊 장마감 | {self.now.strftime('%Y-%m-%d %H:%M EST')}\n"
+        report = f"📊 장마감 브리핑\n🕐 {self.now.strftime('%Y-%m-%d %H:%M EST')}\n"
         report += "=" * 37 + "\n"
 
         tfsa1_total = 0
@@ -149,7 +149,7 @@ class MarketCloseReport:
 
         # TFSA 1
         if self.my_holdings_tfsa1:
-            report += "\n💼 TFSA 1\n"
+            report += "💼 TFSA 1\n"
             for ticker, holding in self.my_holdings_tfsa1.items():
                 shares = holding.get('shares', 0)
                 avg_price = holding.get('avg_price', 0)
@@ -172,25 +172,25 @@ class MarketCloseReport:
                 profit_emoji = "🟢" if profit_pct >= 0 else "🔴"
 
                 name = self.ticker_names.get(ticker, ticker)
-                report += f"\n{ticker} ({name})\n"
-                report += f"  {shares}주 × ${price:.2f} = ${value:.2f}\n"
-                report += f"  오늘: {daily_pct:+.2f}% (${daily_dollar:+.2f}) {daily_emoji}\n"
-                report += f"  총수익: {profit_pct:+.2f}% {profit_emoji}\n"
+                
+                report += f"{ticker} ({name})\n"
+                report += f"{shares}주 × ${price:.2f} = ${value:.2f}\n"
+                report += f"오늘: {daily_pct:+.2f}% ({daily_dollar:+.2f}$) {daily_emoji}\n"
+                report += f"수익: {profit_pct:+.2f}% {profit_emoji}\n\n"
 
             tfsa1_total_profit = (tfsa1_total - tfsa1_cost) / tfsa1_cost * 100 if tfsa1_cost > 0 else 0
             tfsa1_daily_pct = tfsa1_daily_dollar / tfsa1_total * 100 if tfsa1_total > 0 else 0
             daily_emoji = "🟢" if tfsa1_daily_dollar >= 0 else "🔴"
 
-            report += f"\n소계: ${tfsa1_total:.2f}"
-            report += f"  오늘 {tfsa1_daily_pct:+.2f}% {daily_emoji}\n"
+            report += f"소계: ${tfsa1_total:.2f}  오늘 {tfsa1_daily_pct:+.2f}% {daily_emoji}\n"
+            report += "=" * 37 + "\n"
 
         # TFSA 2
         tfsa2_total = 0
         tfsa2_daily_dollar = 0
 
         if self.my_holdings_tfsa2:
-            report += "\n" + "=" * 37 + "\n"
-            report += "\n💰 TFSA 2\n"
+            report += "💰 TFSA 2\n"
 
             for ticker, holding in self.my_holdings_tfsa2.items():
                 shares = holding.get('shares', 0)
@@ -210,29 +210,32 @@ class MarketCloseReport:
                 tfsa2_total += value
                 tfsa2_daily_dollar += daily_dollar
 
-                purpose_label = "여자친구" if "girlfriend" in purpose else "어머님" if "mother" in purpose else ""
+                name = self.ticker_names.get(ticker, ticker)
+                purpose_label = "여자친구 자금" if "girlfriend" in purpose else "어머님 자금" if "mother" in purpose else ""
+                
                 daily_emoji = "🟢" if daily_pct >= 0 else "🔴"
                 profit_emoji = "🟢" if profit_pct >= 0 else "🔴"
 
-                name = self.ticker_names.get(ticker, ticker)
-                report += f"\n{ticker} ({name}) [{purpose_label}]\n"
-                report += f"  {shares}주 × ${price:.2f} = ${value:.2f}\n"
-                report += f"  오늘: {daily_pct:+.2f}% (${daily_dollar:+.2f}) {daily_emoji}\n"
-                report += f"  총수익: {profit_pct:+.2f}% {profit_emoji}\n"
+                report += f"{ticker} ({name}) | {purpose_label}\n"
+                report += f"{shares}주 × ${price:.2f} = ${value:.2f}\n"
+                report += f"오늘: {daily_pct:+.2f}% ({daily_dollar:+.2f}$) {daily_emoji}\n"
+                report += f"수익: {profit_pct:+.2f}% {profit_emoji}\n"
 
                 # 어머님 목표 달성률
                 if target > 0:
                     progress = value / target * 100
-                    report += f"  목표: ${value:.0f} / ${target:.0f} ({progress:.1f}%)\n"
+                    report += f"목표: ${value:.0f} / ${target:.0f} ({progress:.1f}%)\n"
+                report += "\n"
 
             tfsa2_daily_pct = tfsa2_daily_dollar / tfsa2_total * 100 if tfsa2_total > 0 else 0
             daily_emoji = "🟢" if tfsa2_daily_dollar >= 0 else "🔴"
-            report += f"\n소계: ${tfsa2_total:.2f}"
-            report += f"  오늘 {tfsa2_daily_pct:+.2f}% {daily_emoji}\n"
+            report += f"소계: ${tfsa2_total:.2f}  오늘 {tfsa2_daily_pct:+.2f}% {daily_emoji}\n"
+            report += "=" * 37 + "\n"
 
         # 현금
         if self.accumulated_cash > 0:
-            report += f"\n💵 대기 현금: ${self.accumulated_cash:.2f}\n"
+            report += f"💵 대기 현금: ${self.accumulated_cash:.2f}\n"
+            report += "=" * 37 + "\n"
 
         # 전체 요약
         grand_total = tfsa1_total + tfsa2_total + self.accumulated_cash
@@ -240,11 +243,10 @@ class MarketCloseReport:
         total_daily_pct = total_daily / grand_total * 100 if grand_total > 0 else 0
         daily_emoji = "🟢" if total_daily >= 0 else "🔴"
 
-        report += "\n" + "=" * 37 + "\n"
-        report += f"\n📈 전체 요약\n"
+        report += f"📈 전체 요약\n"
         report += f"총 자산: ${grand_total:.2f}\n"
         report += f"오늘 수익: {total_daily:+.2f}$ ({total_daily_pct:+.2f}%) {daily_emoji}\n"
-        report += "\n📌 장후 뉴스 수집 시작\n"
+        report += "📌 장후 뉴스 수집 시작\n"
 
         return report
 
