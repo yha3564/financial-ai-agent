@@ -172,7 +172,7 @@ class MarketCloseReport:
                 profit_emoji = "🟢" if profit_pct >= 0 else "🔴"
 
                 name = self.ticker_names.get(ticker, ticker)
-                
+
                 report += f"{ticker} ({name})\n"
                 report += f"{shares}주 × ${price:.2f} = ${value:.2f}\n"
                 report += f"오늘: {daily_pct:+.2f}% ({daily_dollar:+.2f}$) {daily_emoji}\n"
