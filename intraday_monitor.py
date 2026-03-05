@@ -489,10 +489,26 @@ Rules:
 
         # 매수 후보
         sold_tickers = [a['ticker'] for a in tfsa1_actions if a['action'] == 'SELL' and a['type'] == 'full']
+        sell_proceeds = available_cash - self.accumulated_cash
+
         buy_candidates = [r for r in alert_rankings
                           if r['weighted_score'] > self.alert_threshold
                           and r['ticker'] not in sold_tickers]
         buy_candidates.sort(key=lambda x: x['net_score'], reverse=True)
+
+        # 매도 발생했는데 매수 후보 없으면 전체 자산 중 MER 낮은 순으로 강제 선정 (현금 보유 금지)
+        if available_cash > 0 and not buy_candidates and sell_proceeds > 0:
+            fx_fee = self.cost_settings.get('fx_fee', 0.015)
+            buy_candidates = sorted(
+                [{'ticker': t,
+                  'weighted_score': 0,
+                  'magnitude': 0,
+                  'net_cost': (fx_fee * 2 if not t.endswith('.TO') else 0) + self.mer_map.get(t, 0.003) * 3 / 12,
+                  'net_score': -(self.mer_map.get(t, 0.003))}
+                 for t in self.all_tracked_assets
+                 if self.get_price(t) > 0 and t not in sold_tickers],
+                key=lambda x: x['net_score'], reverse=True
+            )[:5]
 
         if available_cash > 0 and buy_candidates:
             top1 = buy_candidates[0]
