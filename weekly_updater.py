@@ -6,7 +6,12 @@ import feedparser
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 from groq import Groq
-import google.generativeai as genai
+try:
+    from google import genai as genai_new
+    USE_NEW_GENAI = True
+except ImportError:
+    import google.generativeai as genai
+    USE_NEW_GENAI = False
 import pytz
 
 
@@ -21,11 +26,16 @@ class WeeklyUpdater:
         self.gemini_api_key = os.environ.get('GEMINI_API_KEY', '')
 
         self.groq = Groq(api_key=self.groq_api_key)
+        self.gemini = None
         if self.gemini_api_key:
-            genai.configure(api_key=self.gemini_api_key)
-            self.gemini = genai.GenerativeModel('gemini-1.5-flash')
-        else:
-            self.gemini = None
+            try:
+                if USE_NEW_GENAI:
+                    self.gemini = genai_new.Client(api_key=self.gemini_api_key)
+                else:
+                    genai.configure(api_key=self.gemini_api_key)
+                    self.gemini = genai.GenerativeModel('gemini-1.5-flash')
+            except Exception as e:
+                print(f"⚠️ Gemini 초기화 실패: {e}")
 
         self.est = pytz.timezone('America/New_York')
         self.now = datetime.now(self.est)
