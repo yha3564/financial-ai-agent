@@ -99,11 +99,16 @@ class DailyDigest:
             for asset in config.get('tfsa1_assets', []):
                 ticker = asset['ticker']
                 amount = asset['amount']
+                shares = asset.get('shares', 0)  # shares 읽기
                 price = self.get_current_price(ticker)
+                
+                # shares가 있으면 사용, 없으면 계산
+                if shares == 0 and price > 0:
+                    shares = amount / price
                 
                 self.my_holdings_tfsa1[ticker] = {
                     'amount': amount,
-                    'shares': amount / price if price > 0 else 0,
+                    'shares': shares,
                     'purchase_price': price,
                     'purchase_date': self.now.strftime('%Y-%m-%d')
                 }
@@ -112,11 +117,16 @@ class DailyDigest:
             for asset in config.get('tfsa2_assets', []):
                 ticker = asset['ticker']
                 amount = asset['amount']
+                shares = asset.get('shares', 0)  # shares 읽기
                 price = self.get_current_price(ticker)
+                
+                # shares가 있으면 사용, 없으면 계산
+                if shares == 0 and price > 0:
+                    shares = amount / price
                 
                 self.my_holdings_tfsa2[ticker] = {
                     'amount': amount,
-                    'shares': amount / price if price > 0 else 0,
+                    'shares': shares,
                     'purchase_price': price,
                     'purchase_date': self.now.strftime('%Y-%m-%d')
                 }
@@ -753,25 +763,23 @@ Be concise. Only include assets with significant impact."""
                 report += f"   점수: {buy['score']:.1f}\n"
                 report += f"   신뢰도: {buy['confidence']}%\n\n"
         
+        # TFSA 2 간소화 버전
         tfsa2 = recommendations['tfsa2']
-        if tfsa2:
+        if tfsa2 or self.my_holdings_tfsa2:
             if sells or buys or self.my_holdings_tfsa1:
                 report += "="*37 + "\n\n"
             
-            report += "💰 TFSA 2 전환\n\n"
-            for rec in tfsa2:
-                from_name = self.ticker_names.get(rec['from'], rec['from'])
-                to_name = self.ticker_names.get(rec['to'], rec['to'])
-                
-                from_holding = self.my_holdings_tfsa2.get(rec['from'], 0)
-                from_amount = self.calculate_current_value(rec['from'], from_holding)
-                
-                report += f"매도: {rec['from']} ({from_name})\n"
-                report += f"금액: ${from_amount:.0f} (전량)\n\n"
-                report += f"매수: {rec['to']} ({to_name})\n"
-                report += f"금액: ${from_amount:.0f} (전량)\n"
-                report += f"점수: {rec['score']:.1f}\n"
-                report += f"{rec['reason']}\n\n"
+            if tfsa2:
+                # 전환 추천이 있는 경우
+                for rec in tfsa2:
+                    report += f"💰 TFSA 2: {rec['from']} → {rec['to']}\n"
+            else:
+                # 변경 없는 경우 - 현재 보유 자산만 표시
+                current_tickers = list(self.my_holdings_tfsa2.keys())
+                if current_tickers:
+                    ticker = current_tickers[0]
+                    name = self.ticker_names.get(ticker, ticker)
+                    report += f"💰 TFSA 2: {ticker} ({name}) ✅\n"
         
         if not sells and not buys and not tfsa2 and not self.my_holdings_tfsa1:
             report += "✅ 오늘은 특별한 변경사항이 없습니다.\n"
