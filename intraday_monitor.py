@@ -782,6 +782,18 @@ Rules:
             # 추천 생성
             recommendations = self.generate_recommendations(alert_rankings)
 
+            # 액션 없으면 전송 생략
+            tfsa1_actions = recommendations['tfsa1']
+            tfsa2_actions = recommendations['tfsa2']
+            has_action = (
+                any(a['action'] != 'HOLD' for a in tfsa1_actions) or
+                any(a['action'] != 'HOLD' for data in tfsa2_actions.values() for a in data['actions'])
+            )
+            if not has_action:
+                print("✅ 매수/매도 없음 - 알림 생략")
+                self.save_seen_news(seen_ids | {n['url'] for n in new_news})
+                return
+
             # 알림 메시지
             # alert_rankings 티커 관련 뉴스 우선, 나머지는 수집 순서 유지
             alert_tickers = [r['ticker'].replace('.TO', '').lower() for r in alert_rankings]
