@@ -475,6 +475,8 @@ Rules:
         half_threshold = tfsa1_rules.get('half_sell_threshold', 0.25)
         full_threshold = tfsa1_rules.get('full_sell_threshold', 0.35)
 
+        # ── STEP 1: 매도 판단 ──
+        # alert_rankings에 있는 보유 자산만 점수 판단 (없으면 이번 분석에서 영향 없음)
         for ticker, holding in self.my_holdings_tfsa1.items():
             if ticker not in alert_map:
                 continue
@@ -516,49 +518,22 @@ Rules:
                 })
                 available_cash += sell_value
 
-        # 매수 후보
         sold_tickers = [a['ticker'] for a in tfsa1_actions if a['action'] == 'SELL' and a['type'] == 'full']
-        sell_proceeds = available_cash - self.accumulated_cash
 
-        buy_candidates = [r for r in alert_rankings
-                          if r['weighted_score'] > self.alert_threshold
-                          and r['ticker'] not in sold_tickers]
+        # ── STEP 2: 매수 후보 — alert_rankings에서 score > alert_threshold 상위 ──
+        # 전체 분석된 자산 중 기준 넘는 것, 전량매도 예정 제외
+        buy_candidates = [
+            r for r in alert_rankings
+            if r['weighted_score'] > self.alert_threshold
+            and r['ticker'] not in sold_tickers
+            and self.get_price(r['ticker']) > 0
+        ]
         buy_candidates.sort(key=lambda x: x['net_score'], reverse=True)
 
-        is_fallback = False
-        if available_cash > 0 and not buy_candidates and sell_proceeds > 0:
-            is_fallback = True
-            fx_fee = self.cost_settings.get('fx_fee', 0.015)
-            held_candidates = sorted(
-                [{'ticker': t,
-                  'weighted_score': 0,
-                  'magnitude': 0,
-                  'net_cost': (fx_fee * 2 if not t.endswith('.TO') else 0) + self.mer_map.get(t, 0.003) * 3 / 12,
-                  'net_score': -(self.mer_map.get(t, 0.003))}
-                 for t in self.my_holdings_tfsa1
-                 if self.get_price(t) > 0 and t not in sold_tickers],
-                key=lambda x: x['net_score'], reverse=True
-            )
-            if held_candidates:
-                buy_candidates = held_candidates[:2]
-            else:
-                buy_candidates = sorted(
-                    [{'ticker': t,
-                      'weighted_score': 0,
-                      'magnitude': 0,
-                      'net_cost': (fx_fee * 2 if not t.endswith('.TO') else 0) + self.mer_map.get(t, 0.003) * 3 / 12,
-                      'net_score': -(self.mer_map.get(t, 0.003))}
-                     for t in self.all_tracked_assets
-                     if self.get_price(t) > 0 and t not in sold_tickers],
-                    key=lambda x: x['net_score'], reverse=True
-                )[:5]
-
+        # ── STEP 3: 현금이 있으면 매수 ──
         if available_cash > 0 and buy_candidates:
             top1 = buy_candidates[0]
-            # 폴백이면 집중투자(1개), 아니면 기존 로직
-            if is_fallback:
-                buy_list = [top1]
-            elif len(buy_candidates) >= 2:
+            if len(buy_candidates) >= 2:
                 diff = top1['weighted_score'] - buy_candidates[1]['weighted_score']
                 buy_list = [top1] if diff >= concentration_threshold else [top1, buy_candidates[1]]
             else:
@@ -578,28 +553,36 @@ Rules:
                         'expected_pct': candidate['magnitude'] * 100
                     })
 
-        # ── 현금 없을 때 스왑 판단 ──
-        elif available_cash == 0 and buy_candidates:
+        # ── STEP 4: 스왑 판단 — 현금 유무 관계없이 항상 실행 ──
+        # 이미 BUY 액션이 있으면 스왑 불필요
+        # 보유 자산 최하위 score vs alert_rankings 최상위 후보 비교
+        has_buy = any(a['action'] == 'BUY' for a in tfsa1_actions)
+        if not has_buy and buy_candidates:
             top1 = buy_candidates[0]
-            held = [r for r in alert_rankings
-                    if r['ticker'] in self.my_holdings_tfsa1
-                    and r['ticker'] not in sold_tickers
-                    and r['ticker'] != top1['ticker']
-                    and self.get_price(r['ticker']) > 0]
-            # alert_rankings에 없는 보유 자산도 포함 (점수 0으로)
+            # 전량매도 예정 제외, top1 자신 제외한 보유 자산 전체 수집
+            # alert_rankings에 없는 보유 자산은 score=0으로 처리
+            held = []
             for t in self.my_holdings_tfsa1:
-                if t not in [r['ticker'] for r in held] and t not in sold_tickers and t != top1['ticker'] and self.get_price(t) > 0:
-                    held.append({'ticker': t, 'weighted_score': 0, 'magnitude': 0,
-                                 'net_score': 0, 'net_cost': 0, 'reasons': [], 'news_count': 0})
+                if t in sold_tickers or t == top1['ticker']:
+                    continue
+                if self.get_price(t) <= 0:
+                    continue
+                if t in alert_map:
+                    held.append(alert_map[t])
+                else:
+                    held.append({
+                        'ticker': t, 'weighted_score': 0, 'magnitude': 0,
+                        'net_score': 0, 'net_cost': 0, 'reasons': [], 'news_count': 0
+                    })
             if held:
                 weakest = min(held, key=lambda x: x['weighted_score'])
-                swap_threshold = self.config.get('ranking_rules', {}).get('alert_threshold', 0.15)
-                if top1['weighted_score'] - weakest['weighted_score'] >= swap_threshold:
+                if top1['weighted_score'] - weakest['weighted_score'] >= self.alert_threshold:
                     w_ticker = weakest['ticker']
                     w_holding = self.my_holdings_tfsa1.get(w_ticker, {})
                     w_shares = w_holding.get('shares', 0)
                     w_price = self.get_price(w_ticker)
                     w_value = w_shares * w_price
+                    print(f"   🔄 스왑: {w_ticker}(score={weakest['weighted_score']:.3f}) → {top1['ticker']}(score={top1['weighted_score']:.3f})")
                     tfsa1_actions.append({
                         'action': 'SELL', 'type': 'full',
                         'ticker': w_ticker, 'shares': w_shares,
@@ -609,12 +592,14 @@ Rules:
                     })
                     b_price = self.get_price(top1['ticker'])
                     if b_price > 0:
+                        # 스왑 매도금 + 기존 현금 합산해서 매수
+                        total_buy = w_value + available_cash
                         tfsa1_actions.append({
                             'action': 'BUY',
                             'ticker': top1['ticker'],
-                            'shares': round(w_value / b_price, 4),
+                            'shares': round(total_buy / b_price, 4),
                             'price': b_price,
-                            'value': w_value,
+                            'value': total_buy,
                             'score': top1['weighted_score'],
                             'expected_pct': top1['magnitude'] * 100
                         })
