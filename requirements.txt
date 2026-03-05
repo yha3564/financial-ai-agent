@@ -10,3 +10,4 @@ numpy
 feedparser
 beautifulsoup4
 google-generativeai
+flask
