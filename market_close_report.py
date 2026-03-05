@@ -141,7 +141,7 @@ class MarketCloseReport:
     # --------------------------------------------------------
     def generate_report(self):
         report = f"📊 장마감 | {self.now.strftime('%Y-%m-%d %H:%M EST')}\n"
-        report += "━" * 37 + "\n"
+        report += "=" * 37 + "\n"
 
         tfsa1_total = 0
         tfsa1_daily_dollar = 0
@@ -188,7 +188,7 @@ class MarketCloseReport:
         tfsa2_daily_dollar = 0
 
         if self.my_holdings_tfsa2:
-            report += "\n" + "━" * 37 + "\n"
+            report += "\n" + "=" * 37 + "\n"
             report += "\n💰 TFSA 2\n"
 
             for ticker, holding in self.my_holdings_tfsa2.items():
@@ -238,7 +238,7 @@ class MarketCloseReport:
         total_daily_pct = total_daily / grand_total * 100 if grand_total > 0 else 0
         daily_emoji = "🟢" if total_daily >= 0 else "🔴"
 
-        report += "\n" + "━" * 37 + "\n"
+        report += "\n" + "=" * 37 + "\n"
         report += f"\n📈 전체 요약\n"
         report += f"총 자산: ${grand_total:.2f}\n"
         report += f"오늘 수익: {total_daily:+.2f}$ ({total_daily_pct:+.2f}%) {daily_emoji}\n"
