@@ -13,7 +13,12 @@ import pandas_ta_classic as ta
 import numpy as np
 import yfinance as yf
 from groq import Groq
-import google.generativeai as genai
+try:
+    from google import genai as genai_new
+    USE_NEW_GENAI = True
+except ImportError:
+    import google.generativeai as genai
+    USE_NEW_GENAI = False
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 
 
@@ -30,8 +35,18 @@ class IntradayMonitor:
         self.telegram_chat_id = os.environ['TELEGRAM_CHAT_ID']
 
         self.groq = Groq(api_key=self.groq_api_key)
-        genai.configure(api_key=self.gemini_api_key)
-        self.gemini = genai.GenerativeModel('gemini-1.5-flash')
+        self.gemini = None
+        if self.gemini_api_key:
+            try:
+                if USE_NEW_GENAI:
+                    self.gemini_client = genai_new.Client(api_key=self.gemini_api_key)
+                    self.gemini = self.gemini_client
+                else:
+                    genai.configure(api_key=self.gemini_api_key)
+                    self.gemini = genai.GenerativeModel('gemini-1.5-flash')
+                print("✅ Gemini 초기화 완료")
+            except Exception as e:
+                print(f"⚠️ Gemini 초기화 실패: {e}")
 
         self.est = pytz.timezone('America/New_York')
         self.now = datetime.now(self.est)
@@ -305,9 +320,17 @@ Rules:
             print(f"   ⚠️ Groq 오류: {e}, Gemini 폴백...")
 
         # Gemini 폴백
+        if not self.gemini:
+            return {}
         try:
-            response = self.gemini.generate_content(prompt)
-            text = response.text.replace('```json', '').replace('```', '').strip()
+            if USE_NEW_GENAI:
+                response = self.gemini.models.generate_content(
+                    model='gemini-1.5-flash', contents=prompt)
+                text = response.text
+            else:
+                response = self.gemini.generate_content(prompt)
+                text = response.text
+            text = text.replace('```json', '').replace('```', '').strip()
             return json.loads(text)
         except Exception as e:
             print(f"   ❌ Gemini 오류: {e}")
@@ -754,7 +777,12 @@ Rules:
             recommendations = self.generate_recommendations(alert_rankings)
 
             # 알림 메시지
-            top_news = sorted(new_news, key=lambda x: x.get('title', ''), reverse=True)[:3]
+            # alert_rankings 티커 관련 뉴스 우선, 나머지는 수집 순서 유지
+            alert_tickers = [r['ticker'].replace('.TO', '').lower() for r in alert_rankings]
+            def news_priority(n):
+                title_lower = n.get('title', '').lower()
+                return 0 if any(t in title_lower for t in alert_tickers) else 1
+            top_news = sorted(new_news, key=news_priority)[:3]
             alert_msg = self.format_alert(alert_rankings, recommendations, top_news)
 
             # pending_trades 저장
