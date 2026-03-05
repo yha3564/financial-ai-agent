@@ -496,8 +496,9 @@ Rules:
                           and r['ticker'] not in sold_tickers]
         buy_candidates.sort(key=lambda x: x['net_score'], reverse=True)
 
-        # 매도 발생했는데 매수 후보 없으면 → 보유 자산 추가매수 우선, 없으면 전체 MER 낮은 순 (현금 보유 금지)
+        is_fallback = False
         if available_cash > 0 and not buy_candidates and sell_proceeds > 0:
+            is_fallback = True
             fx_fee = self.cost_settings.get('fx_fee', 0.015)
             held_candidates = sorted(
                 [{'ticker': t,
@@ -525,7 +526,10 @@ Rules:
 
         if available_cash > 0 and buy_candidates:
             top1 = buy_candidates[0]
-            if len(buy_candidates) >= 2:
+            # 폴백이면 집중투자(1개), 아니면 기존 로직
+            if is_fallback:
+                buy_list = [top1]
+            elif len(buy_candidates) >= 2:
                 diff = top1['weighted_score'] - buy_candidates[1]['weighted_score']
                 buy_list = [top1] if diff >= concentration_threshold else [top1, buy_candidates[1]]
             else:
