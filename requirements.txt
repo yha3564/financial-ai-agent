@@ -9,5 +9,5 @@ pandas
 numpy
 feedparser
 beautifulsoup4
-google-generativeai
+google-genai
 flask
