@@ -97,7 +97,6 @@ class DailyDigest:
         self.telegram_chat_id = os.environ['TELEGRAM_CHAT_ID']
 
         self.groq = Groq(api_key=self.groq_api_key)
-
         # Gemini 초기화 (API 키 있을 때만)
         self.gemini = None
         if self.gemini_api_key:
