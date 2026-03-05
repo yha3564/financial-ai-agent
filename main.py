@@ -6,7 +6,12 @@ import feedparser
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 from groq import Groq
-import google.generativeai as genai
+try:
+    from google import genai as genai_new
+    USE_NEW_GENAI = True
+except ImportError:
+    import google.generativeai as genai
+    USE_NEW_GENAI = False
 import asyncio
 import pytz
 import yfinance as yf
@@ -78,13 +83,25 @@ class DailyDigest:
 
         self.news_api_key = os.environ['NEWS_API_KEY']
         self.groq_api_key = os.environ['GROQ_API_KEY']
-        self.gemini_api_key = os.environ['GEMINI_API_KEY']
+        self.gemini_api_key = os.environ.get('GEMINI_API_KEY', '')
         self.telegram_token = os.environ['TELEGRAM_BOT_TOKEN']
         self.telegram_chat_id = os.environ['TELEGRAM_CHAT_ID']
 
         self.groq = Groq(api_key=self.groq_api_key)
-        genai.configure(api_key=self.gemini_api_key)
-        self.gemini = genai.GenerativeModel('gemini-1.5-flash')
+
+        # Gemini 초기화 (API 키 있을 때만)
+        self.gemini = None
+        if self.gemini_api_key:
+            try:
+                if USE_NEW_GENAI:
+                    self.gemini_client = genai_new.Client(api_key=self.gemini_api_key)
+                    self.gemini = self.gemini_client  # 사용 시 .models.generate_content() 호출
+                else:
+                    genai.configure(api_key=self.gemini_api_key)
+                    self.gemini = genai.GenerativeModel('gemini-1.5-flash')
+                print("✅ Gemini 초기화 완료")
+            except Exception as e:
+                print(f"⚠️ Gemini 초기화 실패 (Groq만 사용): {e}")
 
         self.est = pytz.timezone('America/New_York')
         self.now = datetime.now(self.est)
