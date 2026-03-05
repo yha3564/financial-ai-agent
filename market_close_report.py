@@ -171,10 +171,11 @@ class MarketCloseReport:
                 daily_emoji = "🟢" if daily_pct >= 0 else "🔴"
                 profit_emoji = "🟢" if profit_pct >= 0 else "🔴"
 
-                report += f"\n{ticker}\n"
+                name = self.ticker_names.get(ticker, ticker)
+                report += f"\n{ticker} ({name})\n"
                 report += f"  {shares}주 × ${price:.2f} = ${value:.2f}\n"
-                report += f"  오늘: {daily_pct:+.2f}% ({daily_dollar:+.2f}$) {daily_emoji}\n"
-                report += f"  수익: {profit_pct:+.2f}% {profit_emoji}\n"
+                report += f"  오늘: {daily_pct:+.2f}% (${daily_dollar:+.2f}) {daily_emoji}\n"
+                report += f"  총수익: {profit_pct:+.2f}% {profit_emoji}\n"
 
             tfsa1_total_profit = (tfsa1_total - tfsa1_cost) / tfsa1_cost * 100 if tfsa1_cost > 0 else 0
             tfsa1_daily_pct = tfsa1_daily_dollar / tfsa1_total * 100 if tfsa1_total > 0 else 0
@@ -213,10 +214,11 @@ class MarketCloseReport:
                 daily_emoji = "🟢" if daily_pct >= 0 else "🔴"
                 profit_emoji = "🟢" if profit_pct >= 0 else "🔴"
 
-                report += f"\n{ticker} [{purpose_label}]\n"
+                name = self.ticker_names.get(ticker, ticker)
+                report += f"\n{ticker} ({name}) [{purpose_label}]\n"
                 report += f"  {shares}주 × ${price:.2f} = ${value:.2f}\n"
-                report += f"  오늘: {daily_pct:+.2f}% ({daily_dollar:+.2f}$) {daily_emoji}\n"
-                report += f"  수익: {profit_pct:+.2f}% {profit_emoji}\n"
+                report += f"  오늘: {daily_pct:+.2f}% (${daily_dollar:+.2f}) {daily_emoji}\n"
+                report += f"  총수익: {profit_pct:+.2f}% {profit_emoji}\n"
 
                 # 어머님 목표 달성률
                 if target > 0:
