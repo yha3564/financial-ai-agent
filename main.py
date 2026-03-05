@@ -39,21 +39,30 @@ class PriceCache:
                 tickers_str = " ".join(chunk)
                 df = yf.download(tickers_str, period="60d", auto_adjust=True, progress=False)
 
-                if len(chunk) == 1:
+                if df.empty:
+                    for ticker in chunk:
+                        self._price_cache[ticker] = 0
+                    continue
+
+                if isinstance(df.columns, pd.MultiIndex):
+                    for ticker in chunk:
+                        try:
+                            close_data = df['Close'][ticker].dropna()
+                            if len(close_data) > 0:
+                                self._price_cache[ticker] = float(close_data.iloc[-1])
+                                self._hist_cache[ticker] = pd.DataFrame({'Close': close_data})
+                            else:
+                                self._price_cache[ticker] = 0
+                        except:
+                            self._price_cache[ticker] = 0
+                else:
                     ticker = chunk[0]
                     if 'Close' in df.columns and len(df) > 0:
-                        self._price_cache[ticker] = float(df['Close'].iloc[-1])
-                        self._hist_cache[ticker] = df
-                else:
-                    if isinstance(df.columns, pd.MultiIndex):
-                        for ticker in chunk:
-                            try:
-                                close_data = df['Close'][ticker].dropna()
-                                if len(close_data) > 0:
-                                    self._price_cache[ticker] = float(close_data.iloc[-1])
-                                    self._hist_cache[ticker] = pd.DataFrame({'Close': close_data})
-                            except:
-                                self._price_cache[ticker] = 0
+                        close_data = df['Close'].dropna()
+                        self._price_cache[ticker] = float(close_data.iloc[-1])
+                        self._hist_cache[ticker] = pd.DataFrame({'Close': close_data})
+                    else:
+                        self._price_cache[ticker] = 0
 
                 if i < len(chunks) - 1:
                     time.sleep(1)
@@ -95,7 +104,7 @@ class DailyDigest:
             try:
                 if USE_NEW_GENAI:
                     self.gemini_client = genai_new.Client(api_key=self.gemini_api_key)
-                    self.gemini = self.gemini_client  # 사용 시 .models.generate_content() 호출
+                    self.gemini = self.gemini_client
                 else:
                     genai.configure(api_key=self.gemini_api_key)
                     self.gemini = genai.GenerativeModel('gemini-1.5-flash')
@@ -758,8 +767,8 @@ JSON만 반환."""
     # 텔레그램 리포트 생성
     # --------------------------------------------------------
     def format_telegram_report(self, recommendations, afterhours_summary=None):
-        report = f"📊 아침 브리핑 | {self.now.strftime('%Y-%m-%d %H:%M EST')}\n"
-        report += "━" * 37 + "\n"
+        report = f"📊 데일리 브리핑 | {self.now.strftime('%Y-%m-%d %H:%M EST')}\n"
+        report += "=" * 37 + "\n"
 
         # 장후 뉴스 요약
         if afterhours_summary:
@@ -779,11 +788,11 @@ JSON만 반환."""
                 for b in afterhours_summary['key_bearish']:
                     report += f"• {b}\n"
 
-            report += "━" * 37 + "\n"
+            report += "=" * 37 + "\n"
 
         # 현재 보유
         report += "\n💼 현재 보유\n"
-        report += "━" * 37 + "\n"
+        report += "=" * 37 + "\n"
 
         report += "\nTFSA 1\n"
         for ticker, holding in self.my_holdings_tfsa1.items():
@@ -803,11 +812,11 @@ JSON만 반환."""
             purpose_short = "여친" if "girlfriend" in purpose else "어머님" if "mother" in purpose else ""
             report += f"{ticker} [{purpose_short}]  ${price:.2f}  {emoji} {profit:+.1f}%  (${value:.0f})\n"
 
-        report += "\n" + "━" * 37 + "\n"
+        report += "\n" + "=" * 37 + "\n"
 
         # 추천
         report += "\n💡 오늘 추천\n"
-        report += "━" * 37 + "\n"
+        report += "=" * 37 + "\n"
 
         # TFSA 1
         tfsa1_actions = recommendations['tfsa1']
