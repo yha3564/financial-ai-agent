@@ -203,26 +203,35 @@ MINIAPP_HTML = '''<!DOCTYPE html>
         html += '<div class="section">';
         html += '<div class="section-title">TFSA 1</div>';
 
-        // 전량 매도 (자동계산)
+        // 매도 (체결가 입력)
         tfsa1_sells.forEach(s => {
+          const typeLabel = s.type === 'full' ? '전량매도' : s.type === 'half' ? '절반매도' : '부분매도';
           html += `<div class="trade-row">
             <div class="trade-info">
               <div class="trade-ticker">${s.ticker}</div>
-              <div class="trade-detail">${s.shares}주 매도</div>
+              <div class="trade-detail">${s.shares}주 ${typeLabel}</div>
             </div>
-            <span class="trade-badge badge-sell-auto">전량매도</span>
-            <div class="auto-label">자동계산</div>
+            <span class="trade-badge badge-sell-auto">${typeLabel}</span>
+            <input class="price-input" type="number" step="0.01"
+              id="sell_price_tfsa1_${s.ticker}"
+              placeholder="$0.00"
+              inputmode="decimal">
           </div>`;
         });
 
-        // 매수 (가격 입력)
+        // 매수 (주수 + 가격 입력)
         tfsa1_buys.forEach(b => {
           html += `<div class="trade-row">
             <div class="trade-info">
               <div class="trade-ticker">${b.ticker}</div>
-              <div class="trade-detail">${b.shares}주 매수</div>
+              <div class="trade-detail">매수</div>
             </div>
             <span class="trade-badge badge-buy">매수</span>
+            <input class="price-input" type="number" step="0.0001"
+              id="shares_tfsa1_${b.ticker}"
+              placeholder="주수"
+              inputmode="decimal"
+              style="width:80px;margin-right:4px">
             <input class="price-input" type="number" step="0.01"
               id="price_tfsa1_${b.ticker}"
               placeholder="$0.00"
@@ -251,10 +260,13 @@ MINIAPP_HTML = '''<!DOCTYPE html>
           html += `<div class="trade-row">
             <div class="trade-info">
               <div class="trade-ticker">${s.ticker}</div>
-              <div class="trade-detail">${s.shares}주 매도</div>
+              <div class="trade-detail">${s.shares}주 전량매도</div>
             </div>
             <span class="trade-badge badge-sell-auto">전량매도</span>
-            <div class="auto-label">자동계산</div>
+            <input class="price-input" type="number" step="0.01"
+              id="sell_price_tfsa2_${ticker}_${s.ticker}"
+              placeholder="$0.00"
+              inputmode="decimal">
           </div>`;
         });
 
@@ -262,9 +274,14 @@ MINIAPP_HTML = '''<!DOCTYPE html>
           html += `<div class="trade-row">
             <div class="trade-info">
               <div class="trade-ticker">${b.ticker}</div>
-              <div class="trade-detail">${b.shares}주 매수</div>
+              <div class="trade-detail">매수</div>
             </div>
             <span class="trade-badge badge-buy">매수</span>
+            <input class="price-input" type="number" step="0.0001"
+              id="shares_tfsa2_${ticker}_${b.ticker}"
+              placeholder="주수"
+              inputmode="decimal"
+              style="width:80px;margin-right:4px">
             <input class="price-input" type="number" step="0.01"
               id="price_tfsa2_${ticker}_${b.ticker}"
               placeholder="$0.00"
@@ -281,24 +298,49 @@ MINIAPP_HTML = '''<!DOCTYPE html>
     async function submitTrades() {
       if (!pendingTrades) return;
 
-      // 매수 가격 수집
+      // 매도 체결가 + 매수 주수/가격 수집
       const prices = {};
+      const shares = {};
       let allFilled = true;
 
+      // TFSA1 매도 체결가
+      const tfsa1_sells = (pendingTrades.tfsa1 || []).filter(a => a.action === 'SELL');
+      tfsa1_sells.forEach(s => {
+        const val = document.getElementById(`sell_price_tfsa1_${s.ticker}`)?.value;
+        if (!val || parseFloat(val) <= 0) { allFilled = false; return; }
+        prices[`sell_tfsa1_${s.ticker}`] = parseFloat(val);
+      });
+
+      // TFSA1 매수 주수+가격
       const tfsa1_buys = (pendingTrades.tfsa1 || []).filter(a => a.action === 'BUY');
       tfsa1_buys.forEach(b => {
-        const val = document.getElementById(`price_tfsa1_${b.ticker}`)?.value;
-        if (!val || parseFloat(val) <= 0) { allFilled = false; return; }
-        prices[`tfsa1_${b.ticker}`] = parseFloat(val);
+        const priceVal = document.getElementById(`price_tfsa1_${b.ticker}`)?.value;
+        const sharesVal = document.getElementById(`shares_tfsa1_${b.ticker}`)?.value;
+        if (!priceVal || parseFloat(priceVal) <= 0) { allFilled = false; return; }
+        if (!sharesVal || parseFloat(sharesVal) <= 0) { allFilled = false; return; }
+        prices[`tfsa1_${b.ticker}`] = parseFloat(priceVal);
+        shares[`tfsa1_${b.ticker}`] = parseFloat(sharesVal);
       });
 
       const tfsa2 = pendingTrades.tfsa2 || {};
       Object.entries(tfsa2).forEach(([ticker, data]) => {
+        // TFSA2 매도 체결가
+        const sells = (data.actions || []).filter(a => a.action === 'SELL');
+        sells.forEach(s => {
+          const val = document.getElementById(`sell_price_tfsa2_${ticker}_${s.ticker}`)?.value;
+          if (!val || parseFloat(val) <= 0) { allFilled = false; return; }
+          prices[`sell_tfsa2_${ticker}_${s.ticker}`] = parseFloat(val);
+        });
+
+        // TFSA2 매수 주수+가격
         const buys = (data.actions || []).filter(a => a.action === 'BUY');
         buys.forEach(b => {
-          const val = document.getElementById(`price_tfsa2_${ticker}_${b.ticker}`)?.value;
-          if (!val || parseFloat(val) <= 0) { allFilled = false; return; }
-          prices[`tfsa2_${ticker}_${b.ticker}`] = parseFloat(val);
+          const priceVal = document.getElementById(`price_tfsa2_${ticker}_${b.ticker}`)?.value;
+          const sharesVal = document.getElementById(`shares_tfsa2_${ticker}_${b.ticker}`)?.value;
+          if (!priceVal || parseFloat(priceVal) <= 0) { allFilled = false; return; }
+          if (!sharesVal || parseFloat(sharesVal) <= 0) { allFilled = false; return; }
+          prices[`tfsa2_${ticker}_${b.ticker}`] = parseFloat(priceVal);
+          shares[`tfsa2_${ticker}_${b.ticker}`] = parseFloat(sharesVal);
         });
       });
 
@@ -315,7 +357,7 @@ MINIAPP_HTML = '''<!DOCTYPE html>
         const res = await fetch('/api/submit_trades', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ trades: pendingTrades, prices })
+          body: JSON.stringify({ trades: pendingTrades, prices, shares })
         });
         const result = await res.json();
 
@@ -370,6 +412,7 @@ def submit_trades():
         data = request.get_json()
         trades = data.get('trades', {})
         prices = data.get('prices', {})
+        actual_shares = data.get('shares', {})
 
         # 포트폴리오 로드
         with open('current_portfolio.json', 'r') as f:
@@ -382,31 +425,38 @@ def submit_trades():
         sells = [a for a in tfsa1_actions if a['action'] == 'SELL']
         buys = [a for a in tfsa1_actions if a['action'] == 'BUY']
 
-        # 매수 총액 계산 (전량매도 자동계산용)
-        buy_total = sum(
-            prices.get(f'tfsa1_{b["ticker"]}', 0) * b['shares']
-            for b in buys
-        )
-
-        # 전량 매도 처리
+        # 매도 처리 (체결가 기준)
+        sell_total = 0
         for sell in sells:
             ticker = sell['ticker']
-            if ticker in portfolio.get('tfsa1', {}):
-                del portfolio['tfsa1'][ticker]
+            sell_price = prices.get(f'sell_tfsa1_{ticker}', 0)
+            sell_shares = sell['shares']
+            sell_total += sell_price * sell_shares
 
-        # 매수 처리
+            existing = portfolio.get('tfsa1', {}).get(ticker, {})
+            old_shares = existing.get('shares', 0)
+            remaining = round(old_shares - sell_shares, 4)
+
+            if remaining <= 0 or sell['type'] == 'full':
+                if ticker in portfolio.get('tfsa1', {}):
+                    del portfolio['tfsa1'][ticker]
+            else:
+                portfolio['tfsa1'][ticker]['shares'] = remaining
+
+        # 매수 처리 (실제 입력 주수+가격 기준)
+        buy_total = 0
         for buy in buys:
             ticker = buy['ticker']
             buy_price = prices.get(f'tfsa1_{ticker}', 0)
+            buy_shares = actual_shares.get(f'tfsa1_{ticker}', buy['shares'])
             if buy_price <= 0:
                 continue
 
-            buy_shares = buy['shares']
+            buy_total += buy_price * buy_shares
             existing = portfolio['tfsa1'].get(ticker, {})
             old_shares = existing.get('shares', 0)
             old_avg = existing.get('avg_price', 0)
 
-            # avg_price 재계산
             if old_shares > 0 and old_avg > 0:
                 new_avg = (old_shares * old_avg + buy_shares * buy_price) / (old_shares + buy_shares)
             else:
@@ -417,8 +467,8 @@ def submit_trades():
                 'avg_price': round(new_avg, 4)
             }
 
-        # accumulated_cash 차감
-        portfolio['accumulated_cash'] = max(0, portfolio.get('accumulated_cash', 0) - buy_total)
+        # accumulated_cash: 기존현금 + 매도금 - 매수금
+        portfolio['accumulated_cash'] = max(0, portfolio.get('accumulated_cash', 0) + sell_total - buy_total)
 
         # ── TFSA 2 처리 ──
         tfsa2_actions = trades.get('tfsa2', {})
@@ -430,7 +480,6 @@ def submit_trades():
             for sell in sell_actions:
                 ticker = sell['ticker']
                 if ticker in portfolio.get('tfsa2', {}):
-                    # purpose 보존
                     purpose_info = {
                         k: v for k, v in portfolio['tfsa2'][ticker].items()
                         if k in ['purpose', 'target_amount']
@@ -440,10 +489,10 @@ def submit_trades():
             for buy in buy_actions:
                 ticker = buy['ticker']
                 buy_price = prices.get(f'tfsa2_{holder_ticker}_{ticker}', 0)
+                buy_shares = actual_shares.get(f'tfsa2_{holder_ticker}_{ticker}', buy['shares'])
                 if buy_price <= 0:
                     continue
 
-                buy_shares = buy['shares']
                 existing = portfolio['tfsa2'].get(ticker, {})
                 old_shares = existing.get('shares', 0)
                 old_avg = existing.get('avg_price', 0)
@@ -453,9 +502,7 @@ def submit_trades():
                 else:
                     new_avg = buy_price
 
-                # purpose 정보 가져오기 (yaml에서)
                 purpose = data.get('purpose', '')
-
                 portfolio['tfsa2'][ticker] = {
                     'shares': round(old_shares + buy_shares, 4),
                     'avg_price': round(new_avg, 4),
