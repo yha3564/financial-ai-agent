@@ -211,11 +211,11 @@ MINIAPP_HTML = '''<!DOCTYPE html>
               <div class="trade-ticker">${s.ticker}</div>
               <div class="trade-detail">${s.shares}주 ${typeLabel}</div>
             </div>
-            <span class="trade-badge badge-sell-auto">${typeLabel}</span>
             <input class="price-input" type="number" step="0.01"
               id="sell_price_tfsa1_${s.ticker}"
               placeholder="$0.00"
               inputmode="decimal">
+            <span class="trade-badge badge-sell-auto">${typeLabel}</span>
           </div>`;
         });
 
@@ -262,11 +262,11 @@ MINIAPP_HTML = '''<!DOCTYPE html>
               <div class="trade-ticker">${s.ticker}</div>
               <div class="trade-detail">${s.shares}주 전량매도</div>
             </div>
-            <span class="trade-badge badge-sell-auto">전량매도</span>
             <input class="price-input" type="number" step="0.01"
               id="sell_price_tfsa2_${ticker}_${s.ticker}"
               placeholder="$0.00"
               inputmode="decimal">
+            <span class="trade-badge badge-sell-auto">전량매도</span>
           </div>`;
         });
 
