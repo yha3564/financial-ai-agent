@@ -30,7 +30,7 @@ class IntradayMonitor:
 
         self.news_api_key = os.environ['NEWS_API_KEY']
         self.groq_api_key = os.environ['GROQ_API_KEY']
-        self.gemini_api_key = os.environ['GEMINI_API_KEY']
+        self.gemini_api_key = os.environ.get('GEMINI_API_KEY', '')
         self.telegram_token = os.environ['TELEGRAM_BOT_TOKEN']
         self.telegram_chat_id = os.environ['TELEGRAM_CHAT_ID']
 
@@ -140,6 +140,8 @@ class IntradayMonitor:
                     ticker = chunk[0]
                     if 'Close' in df.columns and len(df) > 0:
                         self._prices[ticker] = float(df['Close'].iloc[-1])
+                    else:
+                        self._prices[ticker] = 0
                 else:
                     if isinstance(df.columns, pd.MultiIndex):
                         for ticker in chunk:
@@ -148,6 +150,10 @@ class IntradayMonitor:
                                 self._prices[ticker] = float(close.iloc[-1]) if len(close) > 0 else 0
                             except:
                                 self._prices[ticker] = 0
+                    else:
+                        # 단일 티커가 왔지만 chunk > 1인 엣지케이스
+                        for ticker in chunk:
+                            self._prices[ticker] = 0
                 if i < len(chunks) - 1:
                     time.sleep(1)
             except Exception as e:
