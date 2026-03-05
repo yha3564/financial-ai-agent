@@ -790,67 +790,26 @@ JSON만 반환."""
     # 텔레그램 리포트 생성
     # --------------------------------------------------------
     def format_telegram_report(self, recommendations, afterhours_summary=None):
-        report = f"📊 데일리 브리핑 | {self.now.strftime('%Y-%m-%d %H:%M EST')}\n"
+        report = f"📊 데일리 브리핑\n🕐 {self.now.strftime('%Y-%m-%d %H:%M EST')}\n"
         report += "=" * 37 + "\n"
 
-        # 장후 뉴스 요약
         if afterhours_summary:
             conclusion_emoji = "🟢" if "호재" in afterhours_summary.get('conclusion', '') else "🔴" if "악재" in afterhours_summary.get('conclusion', '') else "⚪"
-            report += f"\n📌 장후 뉴스 요약 (어제 16:30 ~ 지금)\n"
-            report += f"{conclusion_emoji} {afterhours_summary.get('conclusion', '')} | "
-            report += f"호재 {afterhours_summary.get('bullish_count', 0)}건 | "
-            report += f"악재 {afterhours_summary.get('bearish_count', 0)}건\n"
-
-            if afterhours_summary.get('key_bullish'):
-                report += "\n🟢 주요 호재\n"
-                for b in afterhours_summary['key_bullish']:
-                    report += f"• {b}\n"
+            report += f"📌 장후 뉴스 요약\n"
+            report += f"{conclusion_emoji} {afterhours_summary.get('conclusion', '')} | 호재 {afterhours_summary.get('bullish_count', 0)}건 | 악재 {afterhours_summary.get('bearish_count', 0)}건\n"
 
             if afterhours_summary.get('key_bearish'):
-                report += "\n🔴 주요 악재\n"
+                report += "🔴 주요 악재\n"
                 for b in afterhours_summary['key_bearish']:
                     report += f"• {b}\n"
 
+            if afterhours_summary.get('key_bullish'):
+                report += "🟢 주요 호재\n"
+                for b in afterhours_summary['key_bullish']:
+                    report += f"• {b}\n"
             report += "=" * 37 + "\n"
 
-        # 현재 보유
-        report += "\n💼 현재 보유\n"
-        report += "=" * 37 + "\n"
-
-        report += "\nTFSA 1\n"
-        tfsa1_total = 0
-        for ticker, holding in self.my_holdings_tfsa1.items():
-            name = self.ticker_names.get(ticker, ticker)
-            shares = holding.get('shares', 0)
-            price = self.get_price(ticker)
-            value = self.get_current_value(ticker, holding)
-            profit = self.get_profit_pct(ticker, holding)
-            emoji = "🟢" if profit >= 0 else "🔴"
-            report += f"{ticker} ({name})\n"
-            report += f"  {shares}주 × ${price:.2f} = ${value:.2f}  {emoji} {profit:+.1f}%\n"
-            tfsa1_total += value
-        if self.accumulated_cash > 0:
-            report += f"💵 현금  ${self.accumulated_cash:.0f}\n"
-            tfsa1_total += self.accumulated_cash
-        report += f"합계: ${tfsa1_total:.2f}\n"
-
-        report += "\nTFSA 2\n"
-        for ticker, holding in self.my_holdings_tfsa2.items():
-            name = self.ticker_names.get(ticker, ticker)
-            shares = holding.get('shares', 0)
-            purpose = holding.get('purpose', '')
-            price = self.get_price(ticker)
-            value = self.get_current_value(ticker, holding)
-            profit = self.get_profit_pct(ticker, holding)
-            emoji = "🟢" if profit >= 0 else "🔴"
-            purpose_short = "여친" if "girlfriend" in purpose else "어머님" if "mother" in purpose else ""
-            report += f"{ticker} ({name}) [{purpose_short}]\n"
-            report += f"  {shares}주 × ${price:.2f} = ${value:.2f}  {emoji} {profit:+.1f}%\n"
-
-        report += "\n" + "=" * 37 + "\n"
-
-        # 추천
-        report += "\n💡 오늘 추천\n"
+        report += "💡 오늘 추천\n"
         report += "=" * 37 + "\n"
 
         # TFSA 1
@@ -858,27 +817,34 @@ JSON만 반환."""
         sells = [a for a in tfsa1_actions if a['action'] == 'SELL']
         buys = [a for a in tfsa1_actions if a['action'] == 'BUY']
 
-        report += f"\nTFSA 1 | 사용가능: ${recommendations['available_cash']:.0f}\n"
+        report += f"TFSA 1\n💵 사용가능: ${recommendations['available_cash']:.0f}\n"
         for s in sells:
-            report += f"  매도: {s['ticker']}  {s['shares']}주 @${s['price']:.2f}  ({s['expected_pct']:+.1f}% 예상)\n"
+            name = self.ticker_names.get(s['ticker'], s['ticker'])
+            report += f"매도\n{s['ticker']} ({name})  {s['shares']}주 @${s['price']:.2f}  ({s['expected_pct']:+.1f}% 예상)\n"
         for b in buys:
-            report += f"  매수: {b['ticker']}  {b['shares']}주 @${b['price']:.2f}  ({b['expected_pct']:+.1f}% 예상)\n"
+            name = self.ticker_names.get(b['ticker'], b['ticker'])
+            report += f"매수\n{b['ticker']} ({name})  {b['shares']}주 @${b['price']:.2f}  ({b['expected_pct']:+.1f}% 예상)\n"
         if not sells and not buys:
-            report += "  → 변경 없음\n"
+            report += "→ 유지\n"
+            
+        report += "=" * 37 + "\n"
 
         # TFSA 2
+        report += "TFSA 2\n"
         for ticker, data in recommendations['tfsa2'].items():
             purpose = data['purpose']
             purpose_label = "여자친구 자금" if "girlfriend" in purpose else "어머님 자금" if "mother" in purpose else purpose
-            report += f"\nTFSA 2 | {purpose_label}\n"
+            name = self.ticker_names.get(ticker, ticker)
+            
+            report += f"{ticker} ({name}) | {purpose_label}\n"
 
             for action in data['actions']:
                 if action['action'] == 'HOLD':
-                    report += f"  → 유지\n"
+                    report += f"→ 유지\n"
                 elif action['action'] == 'SELL':
-                    report += f"  매도: {action['ticker']}  {action['shares']}주 @${action['price']:.2f}\n"
+                    report += f"매도\n{action['shares']}주 @${action['price']:.2f}\n"
                 elif action['action'] == 'BUY':
-                    report += f"  매수: {action['ticker']}  {action['shares']}주 @${action['price']:.2f}  ({action['expected_pct']:+.1f}% 예상)\n"
+                    report += f"매수\n{action['ticker']} ({self.ticker_names.get(action['ticker'], action['ticker'])}) {action['shares']}주 @${action['price']:.2f}  ({action['expected_pct']:+.1f}% 예상)\n"
 
         return report
 
