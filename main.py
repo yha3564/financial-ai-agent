@@ -576,7 +576,7 @@ Be concise. Only include assets with significant impact."""
         return actions
     
     def generate_tfsa2_recommendations(self, my_ranks, all_rankings):
-        """TFSA 2 추천 (전량 교체, 점수 필터 +2)"""
+        """TFSA 2 추천 (여러 자산 각각 전환, 점수 필터 +2)"""
         safe_rankings = [r for r in all_rankings if r['ticker'] in self.safe_assets]
         safe_rankings.sort(key=lambda x: x['weighted_score'], reverse=True)
         
@@ -589,20 +589,21 @@ Be concise. Only include assets with significant impact."""
         if best_safe['weighted_score'] < 2:
             return []
         
-        current_tickers = list(self.my_holdings_tfsa2.keys())
+        recommendations = []
         
-        # CASH.TO도 포함 (제외 안 함)
-        if current_tickers and current_tickers[0] != best_safe['ticker']:
-            current = current_tickers[0]
-            return [{
-                'action': 'SWITCH',
-                'from': current,
-                'to': best_safe['ticker'],
-                'score': best_safe['weighted_score'],
-                'reason': f"+{best_safe['net_return']*100:.1f}% expected"
-            }]
+        # 모든 TFSA 2 자산에 대해 검토
+        for current_ticker in self.my_holdings_tfsa2.keys():
+            # 이미 최선의 자산이면 스킵
+            if current_ticker != best_safe['ticker']:
+                recommendations.append({
+                    'action': 'SWITCH',
+                    'from': current_ticker,
+                    'to': best_safe['ticker'],
+                    'score': best_safe['weighted_score'],
+                    'reason': f"+{best_safe['net_return']*100:.1f}% expected"
+                })
         
-        return []
+        return recommendations
     
     def update_portfolio_from_recommendations(self, recommendations):
         """추천 기반 포트폴리오 자동 업데이트"""
@@ -656,7 +657,7 @@ Be concise. Only include assets with significant impact."""
                 print(f"   ✅ TFSA1에 {ticker} ${amount:.0f} 추가 ({shares:.4f}주, {strategy})")
                 updated = True
         
-        # TFSA 2 처리
+        # TFSA 2 처리 (여러 자산 각각)
         for rec in tfsa2:
             if rec['action'] == 'SWITCH':
                 # 기존 자산 제거
@@ -763,23 +764,23 @@ Be concise. Only include assets with significant impact."""
                 report += f"   점수: {buy['score']:.1f}\n"
                 report += f"   신뢰도: {buy['confidence']}%\n\n"
         
-        # TFSA 2 간소화 버전
+        # TFSA 2 간소화 버전 (여러 자산 표시)
         tfsa2 = recommendations['tfsa2']
         if tfsa2 or self.my_holdings_tfsa2:
             if sells or buys or self.my_holdings_tfsa1:
                 report += "="*37 + "\n\n"
             
+            report += "💰 TFSA 2\n\n"
+            
             if tfsa2:
                 # 전환 추천이 있는 경우
                 for rec in tfsa2:
-                    report += f"💰 TFSA 2: {rec['from']} → {rec['to']}\n"
+                    report += f"{rec['from']} → {rec['to']}\n"
             else:
-                # 변경 없는 경우 - 현재 보유 자산만 표시
-                current_tickers = list(self.my_holdings_tfsa2.keys())
-                if current_tickers:
-                    ticker = current_tickers[0]
+                # 변경 없는 경우 - 모든 보유 자산 표시
+                for ticker in self.my_holdings_tfsa2.keys():
                     name = self.ticker_names.get(ticker, ticker)
-                    report += f"💰 TFSA 2: {ticker} ({name}) ✅\n"
+                    report += f"{ticker} ({name}) ✅\n"
         
         if not sells and not buys and not tfsa2 and not self.my_holdings_tfsa1:
             report += "✅ 오늘은 특별한 변경사항이 없습니다.\n"
