@@ -419,9 +419,17 @@ Rules:
             print(f"   ⚠️ Groq 오류: {e}, Gemini 폴백...")
 
         # Gemini 폴백
+        if not self.gemini:
+            return {}
         try:
-            response = self.gemini.generate_content(prompt)
-            text = response.text.replace('```json', '').replace('```', '').strip()
+            if USE_NEW_GENAI:
+                response = self.gemini.models.generate_content(
+                    model='gemini-1.5-flash', contents=prompt)
+                text = response.text
+            else:
+                response = self.gemini.generate_content(prompt)
+                text = response.text
+            text = text.replace('```json', '').replace('```', '').strip()
             return json.loads(text)
         except Exception as e:
             print(f"   ❌ Gemini 오류: {e}")
@@ -525,9 +533,17 @@ JSON만 반환."""
             text = text.replace('```json', '').replace('```', '').strip()
             return json.loads(text)
         except:
+            if not self.gemini:
+                return None
             try:
-                response = self.gemini.generate_content(prompt)
-                text = response.text.replace('```json', '').replace('```', '').strip()
+                if USE_NEW_GENAI:
+                    response = self.gemini.models.generate_content(
+                        model='gemini-1.5-flash', contents=prompt)
+                    text = response.text
+                else:
+                    response = self.gemini.generate_content(prompt)
+                    text = response.text
+                text = text.replace('```json', '').replace('```', '').strip()
                 return json.loads(text)
             except:
                 return None
