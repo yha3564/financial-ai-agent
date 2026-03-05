@@ -570,7 +570,7 @@ Rules:
     def format_alert(self, alert_rankings, recommendations, top_news):
         now_str = self.now.strftime('%H:%M EST')
         msg = f"🚨 장중 알림 | {now_str}\n"
-        msg += "━" * 37 + "\n"
+        msg += "=" * 37 + "\n"
 
         # 주요 뉴스
         if top_news:
@@ -584,13 +584,13 @@ Rules:
 
         if bearish:
             msg += "\n🔴 영향 자산\n"
-            msg += "━" * 37 + "\n"
+            msg += "=" * 37 + "\n"
             for r in bearish[:5]:
                 msg += f"{r['ticker']}  {r['magnitude']*100:+.1f}% 예상\n"
 
         if bullish:
             msg += "\n🟢 영향 자산\n"
-            msg += "━" * 37 + "\n"
+            msg += "=" * 37 + "\n"
             for r in bullish[:5]:
                 msg += f"{r['ticker']}  {r['magnitude']*100:+.1f}% 예상\n"
 
@@ -600,7 +600,7 @@ Rules:
         buys = [a for a in tfsa1_actions if a['action'] == 'BUY']
 
         msg += "\n💡 TFSA 1\n"
-        msg += "━" * 37 + "\n"
+        msg += "=" * 37 + "\n"
 
         # 보유 현황
         for ticker, holding in self.my_holdings_tfsa1.items():
@@ -624,7 +624,7 @@ Rules:
             purpose = data['purpose']
             label = "여자친구 자금" if "girlfriend" in purpose else "어머님 자금" if "mother" in purpose else purpose
             msg += f"\n💡 TFSA 2 | {label}\n"
-            msg += "━" * 37 + "\n"
+            msg += "=" * 37 + "\n"
 
             holding = self.my_holdings_tfsa2.get(ticker, {})
             price = self.get_price(ticker)
