@@ -809,9 +809,6 @@ JSON만 반환."""
                     report += f"• {b}\n"
             report += "=" * 37 + "\n"
 
-        report += "💡 오늘 추천\n"
-        report += "=" * 37 + "\n"
-
         # TFSA 1
         tfsa1_actions = recommendations['tfsa1']
         sells = [a for a in tfsa1_actions if a['action'] == 'SELL']
@@ -819,6 +816,18 @@ JSON만 반환."""
 
         existing_cash = self.accumulated_cash
         sell_total = sum(s['value'] for s in sells)
+
+        tfsa2_has_action_check = any(
+            any(a['action'] != 'HOLD' for a in data['actions'])
+            for data in recommendations['tfsa2'].values()
+        )
+
+        report += "💡 오늘 추천\n"
+        report += "=" * 37 + "\n"
+
+        if not sells and not buys and not tfsa2_has_action_check:
+            report += "→ 전체 유지\n"
+            return report
 
         if sells or buys:
             report += "TFSA 1\n"
@@ -841,12 +850,7 @@ JSON만 반환."""
             report += "=" * 37 + "\n"
 
         # TFSA 2 - HOLD면 섹션 자체 생략
-        tfsa2_has_action = any(
-            any(a['action'] != 'HOLD' for a in data['actions'])
-            for data in recommendations['tfsa2'].values()
-        )
-
-        if tfsa2_has_action:
+        if tfsa2_has_action_check:
             report += "TFSA 2\n"
             for ticker, data in recommendations['tfsa2'].items():
                 actions = data['actions']
