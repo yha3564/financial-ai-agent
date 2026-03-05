@@ -675,9 +675,14 @@ JSON만 반환."""
         sold_tickers = [a['ticker'] for a in tfsa1_actions if a['action'] == 'SELL' and a['type'] == 'full']
         held_tickers = [t for t in self.my_holdings_tfsa1.keys() if t not in sold_tickers]
 
-        # 매수 후보: 전체 순위에서 상위 (보유 중이지 않거나 추가 매수 가능)
+        # 매수 후보: 전체 순위에서 상위
         buy_candidates = [r for r in rankings if r['weighted_score'] > alert_threshold]
         buy_candidates = sorted(buy_candidates, key=lambda x: x['net_score'], reverse=True)[:5]
+
+        # 매도가 발생했는데 매수 후보가 없으면 → 전체 순위 상위로 강제 선정 (현금 보유 금지)
+        if available_cash > 0 and not buy_candidates and sell_proceeds > 0:
+            buy_candidates = sorted(rankings, key=lambda x: x['net_score'], reverse=True)[:5]
+            buy_candidates = [r for r in buy_candidates if self.get_price(r['ticker']) > 0]
 
         if available_cash > 0 and buy_candidates:
             top1 = buy_candidates[0]
