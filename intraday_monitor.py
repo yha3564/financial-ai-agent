@@ -605,8 +605,6 @@ Rules:
         msg += "=" * 37 + "\n"
         msg += f"💵 보유 현금: ${self.accumulated_cash:.0f}\n"
 
-        # 매도/매수 있는 자산만 보유현황 + 액션 표시
-        action_tickers = set([a['ticker'] for a in sells + buys])
         sell_total = sum(s['value'] for s in sells)
 
         for s in sells:
@@ -620,8 +618,14 @@ Rules:
             msg += f"{total_shares}주  ${price:.2f}  = ${total_value:.2f}\n"
             msg += f"📤 {type_label} 매도 {s['shares']}주\n"
 
+        if sells or buys:
+            total_available = self.accumulated_cash + sell_total
+            if sell_total > 0:
+                msg += f"\n💰 매수가능: ${total_available:.0f} (현금 ${self.accumulated_cash:.0f} + 매도 ${sell_total:.0f})\n"
+            else:
+                msg += f"\n💰 매수가능: ${total_available:.0f}\n"
+
         if buys:
-            msg += f"\n💰 매수가능: ${self.accumulated_cash + sell_total:.0f} (현금 ${self.accumulated_cash:.0f} + 매도 ${sell_total:.0f})\n"
             for b in buys:
                 name = self.ticker_names.get(b['ticker'], b['ticker'])
                 msg += f"\n{b['ticker']} ({name})\n"
