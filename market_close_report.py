@@ -80,27 +80,45 @@ class MarketCloseReport:
 
         try:
             tickers_str = " ".join(tickers)
-            df = yf.download(tickers_str, period="5d", auto_adjust=True, progress=False)
+            df = yf.download(tickers_str, period="5d", auto_adjust=True,
+                           progress=False, threads=False)
 
-            if len(tickers) == 1:
-                ticker = tickers[0]
-                if 'Close' in df.columns and len(df) > 0:
-                    self._prices[ticker] = float(df['Close'].iloc[-1])
-                    self._hist[ticker] = df
-            else:
-                if isinstance(df.columns, pd.MultiIndex):
-                    for ticker in tickers:
-                        try:
-                            close = df['Close'][ticker].dropna()
-                            if len(close) > 0:
-                                self._prices[ticker] = float(close.iloc[-1])
-                                self._hist[ticker] = pd.DataFrame({'Close': close})
-                        except:
+            if df.empty:
+                raise ValueError("빈 데이터")
+
+            if isinstance(df.columns, pd.MultiIndex):
+                for ticker in tickers:
+                    try:
+                        close = df['Close'][ticker].dropna()
+                        if len(close) > 0:
+                            self._prices[ticker] = float(close.iloc[-1])
+                            self._hist[ticker] = pd.DataFrame({'Close': close})
+                        else:
                             self._prices[ticker] = 0
+                    except:
+                        self._prices[ticker] = 0
+            else:
+                ticker = tickers[0]
+                close = df['Close'].dropna()
+                if len(close) > 0:
+                    self._prices[ticker] = float(close.iloc[-1])
+                    self._hist[ticker] = pd.DataFrame({'Close': close})
+
         except Exception as e:
-            print(f"⚠️ 배치 로드 오류: {e}")
-            for t in tickers:
-                self._prices[t] = 0
+            print(f"⚠️ 배치 로드 오류: {e} - 개별 재시도...")
+            for ticker in tickers:
+                try:
+                    df = yf.download(ticker, period="5d", auto_adjust=True,
+                                   progress=False, threads=False)
+                    if not df.empty and 'Close' in df.columns:
+                        close = df['Close'].dropna()
+                        if len(close) > 0:
+                            self._prices[ticker] = float(close.iloc[-1])
+                            self._hist[ticker] = pd.DataFrame({'Close': close})
+                            continue
+                except:
+                    pass
+                self._prices[ticker] = 0
 
     def get_price(self, ticker):
         return self._prices.get(ticker, 0)
