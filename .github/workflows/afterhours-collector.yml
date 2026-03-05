@@ -1,0 +1,40 @@
+name: Afterhours Collector
+
+on:
+  schedule:
+    # 16:30 ~ 09:00 EST = 21:30 ~ 14:00 UTC
+    # 30분마다, 매일 (주말 포함)
+    - cron: '0,30 21-23 * * *'   # 21:00~23:30 UTC (16:00~18:30 EST)
+    - cron: '0,30 0-13 * * *'    # 00:00~13:30 UTC (19:00~08:30 EST)
+  workflow_dispatch:
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Afterhours Collector
+        env:
+          NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
+        run: python afterhours_collector.py
+
+      - name: Commit afterhours_news.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add afterhours_news.json seen_afterhours.json || true
+          git diff --staged --quiet || git commit -m "📰 장후 뉴스 업데이트 $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git push
