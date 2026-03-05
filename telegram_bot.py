@@ -568,8 +568,7 @@ async def setup_webhook():
     bot = Bot(token=TELEGRAM_TOKEN)
     webhook_url = f"{RENDER_URL}/webhook/{TELEGRAM_TOKEN}"
     await bot.set_webhook(webhook_url)
-    print(f"✅ 웹훅 설정 완료: {webhook_url}")
-
+    print(f"✅ 웹훅 설정 완료: {RENDER_URL}/webhook/[TOKEN HIDDEN]")
 
 # ============================================================
 # 메인
