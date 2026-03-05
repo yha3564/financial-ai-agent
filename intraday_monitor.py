@@ -586,13 +586,15 @@ Rules:
             msg += "\n🔴 영향 자산\n"
             msg += "=" * 37 + "\n"
             for r in bearish[:5]:
-                msg += f"{r['ticker']}  {r['magnitude']*100:+.1f}% 예상\n"
+                name = self.ticker_names.get(r['ticker'], r['ticker'])
+                msg += f"{r['ticker']} ({name})  {r['magnitude']*100:+.1f}% 예상\n"
 
         if bullish:
             msg += "\n🟢 영향 자산\n"
             msg += "=" * 37 + "\n"
             for r in bullish[:5]:
-                msg += f"{r['ticker']}  {r['magnitude']*100:+.1f}% 예상\n"
+                name = self.ticker_names.get(r['ticker'], r['ticker'])
+                msg += f"{r['ticker']} ({name})  {r['magnitude']*100:+.1f}% 예상\n"
 
         # TFSA 1 추천
         tfsa1_actions = recommendations['tfsa1']
@@ -601,26 +603,39 @@ Rules:
 
         msg += "\n💡 TFSA 1\n"
         msg += "=" * 37 + "\n"
+        msg += f"💵 보유 현금: ${self.accumulated_cash:.0f}\n"
 
-        # 보유 현황
-        for ticker, holding in self.my_holdings_tfsa1.items():
-            price = self.get_price(ticker)
-            shares = holding.get('shares', 0)
-            value = shares * price
-            msg += f"보유: {ticker}  {shares}주  현재가 ${price:.2f}  (${value:.2f})\n"
+        # 매도/매수 있는 자산만 보유현황 + 액션 표시
+        action_tickers = set([a['ticker'] for a in sells + buys])
+        sell_total = sum(s['value'] for s in sells)
 
-        if sells or buys:
-            msg += "\n"
         for s in sells:
+            name = self.ticker_names.get(s['ticker'], s['ticker'])
+            holding = self.my_holdings_tfsa1.get(s['ticker'], {})
+            total_shares = holding.get('shares', 0)
+            price = self.get_price(s['ticker'])
+            total_value = total_shares * price
             type_label = "전량" if s['type'] == 'full' else "절반" if s['type'] == 'half' else "부분"
-            msg += f"매도: {s['ticker']}  {s['shares']}주 @${s['price']:.2f}  ({type_label})\n"
-        for b in buys:
-            msg += f"매수: {b['ticker']}  {b['shares']}주 @${b['price']:.2f}\n"
+            msg += f"\n{s['ticker']} ({name})\n"
+            msg += f"{total_shares}주  ${price:.2f}  = ${total_value:.2f}\n"
+            msg += f"📤 {type_label} 매도 {s['shares']}주\n"
+
+        if buys:
+            msg += f"\n💰 매수가능: ${self.accumulated_cash + sell_total:.0f} (현금 ${self.accumulated_cash:.0f} + 매도 ${sell_total:.0f})\n"
+            for b in buys:
+                name = self.ticker_names.get(b['ticker'], b['ticker'])
+                msg += f"\n{b['ticker']} ({name})\n"
+                msg += f"📥 매수 {b['shares']}주 @${b['price']:.2f} = ${b['value']:.2f}\n"
+
         if not sells and not buys:
             msg += "→ 변경 없음\n"
 
-        # TFSA 2 추천
+        # TFSA 2 - HOLD면 섹션 생략
         for ticker, data in recommendations['tfsa2'].items():
+            actions = data['actions']
+            if all(a['action'] == 'HOLD' for a in actions):
+                continue
+
             purpose = data['purpose']
             label = "여자친구 자금" if "girlfriend" in purpose else "어머님 자금" if "mother" in purpose else purpose
             msg += f"\n💡 TFSA 2 | {label}\n"
@@ -630,15 +645,15 @@ Rules:
             price = self.get_price(ticker)
             shares = holding.get('shares', 0)
             value = shares * price
-            msg += f"보유: {ticker}  {shares}주  현재가 ${price:.2f}  (${value:.2f})\n\n"
+            name = self.ticker_names.get(ticker, ticker)
+            msg += f"{ticker} ({name})\n{shares}주  ${price:.2f}  = ${value:.2f}\n"
 
-            for action in data['actions']:
-                if action['action'] == 'HOLD':
-                    msg += f"→ 유지\n"
-                elif action['action'] == 'SELL':
-                    msg += f"매도: {action['ticker']}  {action['shares']}주 @${action['price']:.2f}\n"
+            for action in actions:
+                if action['action'] == 'SELL':
+                    msg += f"📤 전량 매도 {action['shares']}주 @${action['price']:.2f} = ${action['value']:.2f}\n"
                 elif action['action'] == 'BUY':
-                    msg += f"매수: {action['ticker']}  {action['shares']}주 @${action['price']:.2f}\n"
+                    buy_name = self.ticker_names.get(action['ticker'], action['ticker'])
+                    msg += f"📥 매수\n{action['ticker']} ({buy_name})\n{action['shares']}주 @${action['price']:.2f} = ${action['value']:.2f}\n"
 
         return msg
 
