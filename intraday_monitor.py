@@ -578,6 +578,47 @@ Rules:
                         'expected_pct': candidate['magnitude'] * 100
                     })
 
+        # ── 현금 없을 때 스왑 판단 ──
+        elif available_cash == 0 and buy_candidates:
+            top1 = buy_candidates[0]
+            held = [r for r in alert_rankings
+                    if r['ticker'] in self.my_holdings_tfsa1
+                    and r['ticker'] not in sold_tickers
+                    and r['ticker'] != top1['ticker']
+                    and self.get_price(r['ticker']) > 0]
+            # alert_rankings에 없는 보유 자산도 포함 (점수 0으로)
+            for t in self.my_holdings_tfsa1:
+                if t not in [r['ticker'] for r in held] and t not in sold_tickers and t != top1['ticker'] and self.get_price(t) > 0:
+                    held.append({'ticker': t, 'weighted_score': 0, 'magnitude': 0,
+                                 'net_score': 0, 'net_cost': 0, 'reasons': [], 'news_count': 0})
+            if held:
+                weakest = min(held, key=lambda x: x['weighted_score'])
+                swap_threshold = self.config.get('ranking_rules', {}).get('alert_threshold', 0.15)
+                if top1['weighted_score'] - weakest['weighted_score'] >= swap_threshold:
+                    w_ticker = weakest['ticker']
+                    w_holding = self.my_holdings_tfsa1.get(w_ticker, {})
+                    w_shares = w_holding.get('shares', 0)
+                    w_price = self.get_price(w_ticker)
+                    w_value = w_shares * w_price
+                    tfsa1_actions.append({
+                        'action': 'SELL', 'type': 'full',
+                        'ticker': w_ticker, 'shares': w_shares,
+                        'price': w_price, 'value': w_value,
+                        'score': weakest['weighted_score'],
+                        'expected_pct': weakest['magnitude'] * 100
+                    })
+                    b_price = self.get_price(top1['ticker'])
+                    if b_price > 0:
+                        tfsa1_actions.append({
+                            'action': 'BUY',
+                            'ticker': top1['ticker'],
+                            'shares': round(w_value / b_price, 4),
+                            'price': b_price,
+                            'value': w_value,
+                            'score': top1['weighted_score'],
+                            'expected_pct': top1['magnitude'] * 100
+                        })
+
         # ── TFSA 2 (목적별) ──
         tfsa2_actions = {}
         full_threshold_t2 = tfsa2_rules.get('full_sell_threshold', 0.30)
