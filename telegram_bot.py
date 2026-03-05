@@ -580,6 +580,7 @@ def push_to_github():
         subprocess.run(['git', 'config', 'user.name', 'Financial Bot'], check=True)
         subprocess.run(['git', 'config', 'user.email', 'bot@financial.ai'], check=True)
         subprocess.run(['git', 'add', 'current_portfolio.json'], check=True)
+        subprocess.run(['git', 'add', 'today_sold.json'], check=False)  # 없을 수도 있으므로 check=False
 
         now_str = datetime.now(est).strftime('%Y-%m-%d %H:%M EST')
         subprocess.run(['git', 'commit', '-m', f'💼 포트폴리오 업데이트 {now_str}'], check=True)
