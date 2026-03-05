@@ -19,7 +19,12 @@ TELEGRAM_TOKEN = os.environ['TELEGRAM_BOT_TOKEN']
 TELEGRAM_CHAT_ID = os.environ['TELEGRAM_CHAT_ID']
 GH_TOKEN = os.environ['GH_TOKEN']
 GITHUB_REPO = os.environ.get('GITHUB_REPOSITORY', 'yha3564/financial-ai-agent')
-RENDER_URL = os.environ.get('RENDER_URL', '')  # Render 배포 URL
+# Render's built-in env var is RENDER_EXTERNAL_URL; fall back to custom RENDER_URL
+RENDER_URL = (
+    os.environ.get('RENDER_EXTERNAL_URL') or
+    os.environ.get('RENDER_URL') or
+    ''
+).rstrip('/')
 
 est = pytz.timezone('America/New_York')
 
@@ -555,6 +560,11 @@ async def webhook():
 # ============================================================
 
 async def setup_webhook():
+    if not RENDER_URL or not RENDER_URL.startswith('https://'):
+        print(f"⚠️ 웹훅 설정 건너뜀: RENDER_URL이 유효하지 않음 ({repr(RENDER_URL)})")
+        print("   → Render 대시보드에서 RENDER_EXTERNAL_URL 또는 RENDER_URL 환경변수를 확인하세요")
+        return
+
     bot = Bot(token=TELEGRAM_TOKEN)
     webhook_url = f"{RENDER_URL}/webhook/{TELEGRAM_TOKEN}"
     await bot.set_webhook(webhook_url)
@@ -569,8 +579,7 @@ if __name__ == '__main__':
     import asyncio
 
     # 웹훅 설정
-    if RENDER_URL:
-        asyncio.run(setup_webhook())
+    asyncio.run(setup_webhook())
 
     port = int(os.environ.get('PORT', 5000))
     flask_app.run(host='0.0.0.0', port=port)
