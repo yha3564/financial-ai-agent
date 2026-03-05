@@ -679,10 +679,19 @@ JSON만 반환."""
         buy_candidates = [r for r in rankings if r['weighted_score'] > alert_threshold]
         buy_candidates = sorted(buy_candidates, key=lambda x: x['net_score'], reverse=True)[:5]
 
-        # 매도가 발생했는데 매수 후보가 없으면 → 전체 순위 상위로 강제 선정 (현금 보유 금지)
+        # 매도 발생했는데 매수 후보 없으면 → 보유 자산 추가매수 우선, 없으면 전체 상위 (현금 보유 금지)
         if available_cash > 0 and not buy_candidates and sell_proceeds > 0:
-            buy_candidates = sorted(rankings, key=lambda x: x['net_score'], reverse=True)[:5]
-            buy_candidates = [r for r in buy_candidates if self.get_price(r['ticker']) > 0]
+            held_candidates = [r for r in rankings
+                               if r['ticker'] in self.my_holdings_tfsa1
+                               and r['ticker'] not in sold_tickers
+                               and self.get_price(r['ticker']) > 0]
+            if held_candidates:
+                buy_candidates = sorted(held_candidates, key=lambda x: x['net_score'], reverse=True)[:2]
+            else:
+                buy_candidates = sorted(
+                    [r for r in rankings if self.get_price(r['ticker']) > 0],
+                    key=lambda x: x['net_score'], reverse=True
+                )[:5]
 
         if available_cash > 0 and buy_candidates:
             top1 = buy_candidates[0]
