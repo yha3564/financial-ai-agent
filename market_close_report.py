@@ -29,8 +29,13 @@ class MarketCloseReport:
         self.load_portfolio()
         self.build_ticker_name_map()
 
-        # 보유 자산 가격 배치 로드
-        all_tickers = list(self.my_holdings_tfsa1.keys()) + list(self.my_holdings_tfsa2.keys())
+        # 보유 자산 + 오늘 매도 티커 가격 배치 로드
+        sold_tickers = [s['ticker'] for s in self.today_sells]
+        all_tickers = list(set(
+            list(self.my_holdings_tfsa1.keys()) +
+            list(self.my_holdings_tfsa2.keys()) +
+            sold_tickers
+        ))
         self._load_prices(all_tickers)
 
         print(f"✅ 초기화 완료 - {self.now.strftime('%Y-%m-%d %H:%M %Z')}")
@@ -58,6 +63,17 @@ class MarketCloseReport:
             if ticker in self.my_holdings_tfsa2:
                 self.my_holdings_tfsa2[ticker]['purpose'] = asset.get('purpose', '')
                 self.my_holdings_tfsa2[ticker]['target_amount'] = asset.get('target_amount', 0)
+
+        # 오늘 매도 실현손익 로드
+        self.today_sells = []
+        try:
+            with open('today_sold.json', 'r', encoding='utf-8') as f:
+                sold_data = json.load(f)
+            if sold_data.get('date') == self.now.strftime('%Y-%m-%d'):
+                self.today_sells = sold_data.get('sells', [])
+            print(f"📋 오늘 매도 기록: {len(self.today_sells)}건")
+        except FileNotFoundError:
+            print("📋 오늘 매도 기록 없음")
 
     def build_ticker_name_map(self):
         self.ticker_names = {}
@@ -146,6 +162,33 @@ class MarketCloseReport:
         tfsa1_total = 0
         tfsa1_daily_dollar = 0
         tfsa1_cost = 0
+
+        # 오늘 매도 실현손익
+        if self.today_sells:
+            report += "📤 오늘 매도 실현손익\n"
+            report += "=" * 37 + "\n"
+            total_realized = 0
+            for s in self.today_sells:
+                ticker = s['ticker']
+                name = self.ticker_names.get(ticker, ticker)
+                shares = s['shares']
+                avg_price = s['avg_price']
+                sell_price = s['sell_price']
+                sell_value = s['sell_value']
+                profit = s['profit']
+                profit_pct = s['profit_pct']
+                type_label = "전량" if s['type'] == 'full' else "절반" if s['type'] == 'half' else "부분"
+                profit_emoji = "🟢" if profit >= 0 else "🔴"
+                total_realized += profit
+
+                report += f"{ticker} ({name}) {type_label}매도\n"
+                report += f"{shares}주 @${sell_price:.2f} = ${sell_value:.2f}\n"
+                report += f"평균단가 ${avg_price:.2f} → 매도가 ${sell_price:.2f}\n"
+                report += f"실현손익: {profit:+.2f}$ ({profit_pct:+.2f}%) {profit_emoji}\n\n"
+
+            total_emoji = "🟢" if total_realized >= 0 else "🔴"
+            report += f"실현손익 합계: {total_realized:+.2f}$ {total_emoji}\n"
+            report += "=" * 37 + "\n"
 
         # TFSA 1
         if self.my_holdings_tfsa1:
