@@ -161,7 +161,6 @@ class MarketCloseReport:
 
         tfsa1_total = 0
         tfsa1_daily_dollar = 0
-        tfsa1_cost = 0
 
         # 오늘 매도 실현손익
         if self.today_sells:
@@ -203,13 +202,11 @@ class MarketCloseReport:
                     continue
 
                 value = shares * price
-                cost = shares * avg_price
                 profit_pct = (price - avg_price) / avg_price * 100 if avg_price > 0 else 0
                 daily_dollar = value * daily_pct / 100
 
                 tfsa1_total += value
                 tfsa1_daily_dollar += daily_dollar
-                tfsa1_cost += cost
 
                 daily_emoji = "🟢" if daily_pct >= 0 else "🔴"
                 profit_emoji = "🟢" if profit_pct >= 0 else "🔴"
@@ -221,7 +218,6 @@ class MarketCloseReport:
                 report += f"오늘: {daily_pct:+.2f}% ({daily_dollar:+.2f}$) {daily_emoji}\n"
                 report += f"수익: {profit_pct:+.2f}% {profit_emoji}\n\n"
 
-            tfsa1_total_profit = (tfsa1_total - tfsa1_cost) / tfsa1_cost * 100 if tfsa1_cost > 0 else 0
             tfsa1_daily_pct = tfsa1_daily_dollar / tfsa1_total * 100 if tfsa1_total > 0 else 0
             daily_emoji = "🟢" if tfsa1_daily_dollar >= 0 else "🔴"
 
