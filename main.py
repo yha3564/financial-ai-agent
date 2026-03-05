@@ -818,22 +818,32 @@ JSON만 반환."""
         report += "=" * 37 + "\n"
 
         report += "\nTFSA 1\n"
+        tfsa1_total = 0
         for ticker, holding in self.my_holdings_tfsa1.items():
+            name = self.ticker_names.get(ticker, ticker)
             price = self.get_price(ticker)
             value = self.get_current_value(ticker, holding)
             profit = self.get_profit_pct(ticker, holding)
             emoji = "🟢" if profit >= 0 else "🔴"
-            report += f"{ticker}  ${price:.2f}  {emoji} {profit:+.1f}%\n"
+            report += f"{ticker} ({name})\n"
+            report += f"  현재: ${price:.2f}  {emoji} {profit:+.1f}%  (${value:.0f})\n"
+            tfsa1_total += value
+        if self.accumulated_cash > 0:
+            report += f"💵 현금  ${self.accumulated_cash:.0f}\n"
+            tfsa1_total += self.accumulated_cash
+        report += f"합계: ${tfsa1_total:.0f}\n"
 
         report += "\nTFSA 2\n"
         for ticker, holding in self.my_holdings_tfsa2.items():
+            name = self.ticker_names.get(ticker, ticker)
             purpose = holding.get('purpose', '')
             price = self.get_price(ticker)
             value = self.get_current_value(ticker, holding)
             profit = self.get_profit_pct(ticker, holding)
             emoji = "🟢" if profit >= 0 else "🔴"
             purpose_short = "여친" if "girlfriend" in purpose else "어머님" if "mother" in purpose else ""
-            report += f"{ticker} [{purpose_short}]  ${price:.2f}  {emoji} {profit:+.1f}%  (${value:.0f})\n"
+            report += f"{ticker} ({name}) [{purpose_short}]\n"
+            report += f"  현재: ${price:.2f}  {emoji} {profit:+.1f}%  (${value:.0f})\n"
 
         report += "\n" + "=" * 37 + "\n"
 
