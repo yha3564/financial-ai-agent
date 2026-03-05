@@ -817,34 +817,55 @@ JSON만 반환."""
         sells = [a for a in tfsa1_actions if a['action'] == 'SELL']
         buys = [a for a in tfsa1_actions if a['action'] == 'BUY']
 
-        report += f"TFSA 1\n💵 사용가능: ${recommendations['available_cash']:.0f}\n"
-        for s in sells:
-            name = self.ticker_names.get(s['ticker'], s['ticker'])
-            report += f"매도\n{s['ticker']} ({name})  {s['shares']}주 @${s['price']:.2f}  ({s['expected_pct']:+.1f}% 예상)\n"
-        for b in buys:
-            name = self.ticker_names.get(b['ticker'], b['ticker'])
-            report += f"매수\n{b['ticker']} ({name})  {b['shares']}주 @${b['price']:.2f}  ({b['expected_pct']:+.1f}% 예상)\n"
-        if not sells and not buys:
-            report += "→ 유지\n"
-            
-        report += "=" * 37 + "\n"
+        existing_cash = self.accumulated_cash
+        sell_total = sum(s['value'] for s in sells)
 
-        # TFSA 2
-        report += "TFSA 2\n"
-        for ticker, data in recommendations['tfsa2'].items():
-            purpose = data['purpose']
-            purpose_label = "여자친구 자금" if "girlfriend" in purpose else "어머님 자금" if "mother" in purpose else purpose
-            name = self.ticker_names.get(ticker, ticker)
-            
-            report += f"{ticker} ({name}) | {purpose_label}\n"
+        if sells or buys:
+            report += "TFSA 1\n"
+            report += f"💵 보유 현금: ${existing_cash:.0f}\n"
 
-            for action in data['actions']:
-                if action['action'] == 'HOLD':
-                    report += f"→ 유지\n"
-                elif action['action'] == 'SELL':
-                    report += f"매도\n{action['shares']}주 @${action['price']:.2f}\n"
-                elif action['action'] == 'BUY':
-                    report += f"매수\n{action['ticker']} ({self.ticker_names.get(action['ticker'], action['ticker'])}) {action['shares']}주 @${action['price']:.2f}  ({action['expected_pct']:+.1f}% 예상)\n"
+            for s in sells:
+                name = self.ticker_names.get(s['ticker'], s['ticker'])
+                type_label = "전량" if s['type'] == 'full' else "절반" if s['type'] == 'half' else "부분"
+                report += f"\n📤 {type_label} 매도\n{s['ticker']} ({name})\n{s['shares']}주 @${s['price']:.2f} = ${s['value']:.2f}\n"
+
+            if buys:
+                if sell_total > 0:
+                    report += f"\n💰 매수가능: ${existing_cash + sell_total:.0f} (현금 ${existing_cash:.0f} + 매도 ${sell_total:.0f})\n"
+                else:
+                    report += f"\n💰 매수가능: ${existing_cash:.0f}\n"
+                for b in buys:
+                    name = self.ticker_names.get(b['ticker'], b['ticker'])
+                    report += f"\n📥 매수\n{b['ticker']} ({name})\n{b['shares']}주 @${b['price']:.2f} = ${b['value']:.2f}  ({b['expected_pct']:+.1f}% 예상)\n"
+
+            report += "=" * 37 + "\n"
+
+        # TFSA 2 - HOLD면 섹션 자체 생략
+        tfsa2_has_action = any(
+            any(a['action'] != 'HOLD' for a in data['actions'])
+            for data in recommendations['tfsa2'].values()
+        )
+
+        if tfsa2_has_action:
+            report += "TFSA 2\n"
+            for ticker, data in recommendations['tfsa2'].items():
+                actions = data['actions']
+                if all(a['action'] == 'HOLD' for a in actions):
+                    continue  # HOLD만 있으면 생략
+
+                purpose = data['purpose']
+                purpose_label = "여자친구 자금" if "girlfriend" in purpose else "어머님 자금" if "mother" in purpose else purpose
+                name = self.ticker_names.get(ticker, ticker)
+                report += f"\n{ticker} ({name}) | {purpose_label}\n"
+
+                sell_val = 0
+                for action in actions:
+                    if action['action'] == 'SELL':
+                        report += f"📤 전량 매도\n{action['shares']}주 @${action['price']:.2f} = ${action['value']:.2f}\n"
+                        sell_val = action['value']
+                    elif action['action'] == 'BUY':
+                        buy_name = self.ticker_names.get(action['ticker'], action['ticker'])
+                        report += f"📥 매수\n{action['ticker']} ({buy_name})\n{action['shares']}주 @${action['price']:.2f} = ${action['value']:.2f}  ({action['expected_pct']:+.1f}% 예상)\n"
 
         return report
 
