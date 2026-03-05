@@ -673,14 +673,15 @@ JSON만 반환."""
 
         # 매수 판단 (전체 자산 중 상위)
         sold_tickers = [a['ticker'] for a in tfsa1_actions if a['action'] == 'SELL' and a['type'] == 'full']
-        held_tickers = [t for t in self.my_holdings_tfsa1.keys() if t not in sold_tickers]
 
         # 매수 후보: 전체 순위에서 상위
         buy_candidates = [r for r in rankings if r['weighted_score'] > alert_threshold]
         buy_candidates = sorted(buy_candidates, key=lambda x: x['net_score'], reverse=True)[:5]
 
         # 매도 발생했는데 매수 후보 없으면 → 보유 자산 추가매수 우선, 없으면 전체 상위 (현금 보유 금지)
+        is_fallback = False
         if available_cash > 0 and not buy_candidates and sell_proceeds > 0:
+            is_fallback = True
             held_candidates = [r for r in rankings
                                if r['ticker'] in self.my_holdings_tfsa1
                                and r['ticker'] not in sold_tickers
@@ -695,16 +696,13 @@ JSON만 반환."""
 
         if available_cash > 0 and buy_candidates:
             top1 = buy_candidates[0]
-            if len(buy_candidates) >= 2:
+            # 폴백이면 집중투자(1개), 아니면 기존 로직
+            if is_fallback:
+                buy_list = [top1]
+            elif len(buy_candidates) >= 2:
                 top2 = buy_candidates[1]
                 diff = top1['weighted_score'] - top2['weighted_score']
-
-                if diff >= concentration_threshold:
-                    # 집중 투자
-                    buy_list = [top1]
-                else:
-                    # 분할 투자 (상위 2개)
-                    buy_list = [top1, top2]
+                buy_list = [top1] if diff >= concentration_threshold else [top1, top2]
             else:
                 buy_list = [top1]
 
@@ -883,6 +881,9 @@ JSON만 반환."""
                         sell_val = action['value']
                     elif action['action'] == 'BUY':
                         buy_name = self.ticker_names.get(action['ticker'], action['ticker'])
+                        if sell_val > 0:
+                            report += f"💰 매도금: ${sell_val:.0f}\n"
+                            sell_val = 0
                         report += f"📥 매수\n{action['ticker']} ({buy_name})\n{action['shares']}주 @${action['price']:.2f} = ${action['value']:.2f}  ({action['expected_pct']:+.1f}% 예상)\n"
 
         return report
