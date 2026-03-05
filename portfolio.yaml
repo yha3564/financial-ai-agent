@@ -247,6 +247,9 @@ safe_assets:
   
   - ticker: "FTS.TO"
     name: "Fortis Utilities"
+  
+  - ticker: "CASH.TO"
+    name: "Cash"
 
 # ===========================================
 # 거래 규칙
