@@ -30,49 +30,73 @@ class PriceCache:
         self._hist_cache = {}
 
     def batch_download(self, tickers):
-        """전체 자산 배치 다운로드 (20개씩 청크)"""
-        print(f"\n📥 자산 가격 배치 다운로드 중 ({len(tickers)}개)...")
-        chunks = [tickers[i:i+20] for i in range(0, len(tickers), 20)]
+        """전체 자산 한번에 다운로드 후 파싱"""
+        print(f"\n📥 자산 가격 다운로드 중 ({len(tickers)}개)...")
 
-        for i, chunk in enumerate(chunks):
-            try:
-                tickers_str = " ".join(chunk)
-                df = yf.download(tickers_str, period="60d", auto_adjust=True, progress=False)
+        try:
+            tickers_str = " ".join(tickers)
+            df = yf.download(tickers_str, period="5d", auto_adjust=True,
+                           progress=False, threads=False)
 
-                if df.empty:
-                    for ticker in chunk:
-                        self._price_cache[ticker] = 0
-                    continue
+            if df.empty:
+                print("⚠️ 전체 다운로드 실패 - 개별 다운로드 시도...")
+                self._fallback_download(tickers)
+                return
 
-                if isinstance(df.columns, pd.MultiIndex):
-                    for ticker in chunk:
-                        try:
-                            close_data = df['Close'][ticker].dropna()
-                            if len(close_data) > 0:
-                                self._price_cache[ticker] = float(close_data.iloc[-1])
-                                self._hist_cache[ticker] = pd.DataFrame({'Close': close_data})
+            close = df['Close'] if 'Close' in df.columns else df.xs('Close', axis=1, level=0)
+
+            if isinstance(close, pd.Series):
+                # 티커 1개
+                ticker = tickers[0]
+                data = close.dropna()
+                if len(data) > 0:
+                    self._price_cache[ticker] = float(data.iloc[-1])
+                    self._hist_cache[ticker] = pd.DataFrame({'Close': data})
+            else:
+                # 여러 티커
+                for ticker in tickers:
+                    try:
+                        if ticker in close.columns:
+                            data = close[ticker].dropna()
+                            if len(data) > 0:
+                                self._price_cache[ticker] = float(data.iloc[-1])
+                                self._hist_cache[ticker] = pd.DataFrame({'Close': data})
                             else:
                                 self._price_cache[ticker] = 0
-                        except:
+                        else:
                             self._price_cache[ticker] = 0
-                else:
-                    ticker = chunk[0]
-                    if 'Close' in df.columns and len(df) > 0:
-                        close_data = df['Close'].dropna()
-                        self._price_cache[ticker] = float(close_data.iloc[-1])
-                        self._hist_cache[ticker] = pd.DataFrame({'Close': close_data})
-                    else:
+                    except:
                         self._price_cache[ticker] = 0
 
-                if i < len(chunks) - 1:
-                    time.sleep(1)
+            loaded = sum(1 for v in self._price_cache.values() if v > 0)
+            print(f"✅ 가격 로드 완료 ({loaded}/{len(tickers)}개 성공)")
 
-            except Exception as e:
-                print(f"   ⚠️ 배치 {i+1} 오류: {e}")
-                for ticker in chunk:
-                    self._price_cache[ticker] = 0
+            # 실패한 티커 개별 재시도
+            failed = [t for t in tickers if self._price_cache.get(t, 0) == 0]
+            if failed:
+                print(f"⚠️ {len(failed)}개 개별 재시도...")
+                self._fallback_download(failed)
 
-        print(f"✅ 가격 로드 완료 ({len(self._price_cache)}개)")
+        except Exception as e:
+            print(f"⚠️ 전체 다운로드 오류: {e} - 개별 다운로드 시도...")
+            self._fallback_download(tickers)
+
+    def _fallback_download(self, tickers):
+        """개별 티커 다운로드 (폴백)"""
+        for ticker in tickers:
+            try:
+                df = yf.download(ticker, period="5d", auto_adjust=True,
+                               progress=False, threads=False)
+                if not df.empty and 'Close' in df.columns:
+                    data = df['Close'].dropna()
+                    if len(data) > 0:
+                        self._price_cache[ticker] = float(data.iloc[-1])
+                        self._hist_cache[ticker] = pd.DataFrame({'Close': data})
+                        continue
+            except:
+                pass
+            self._price_cache[ticker] = 0
+            time.sleep(0.5)
 
     def get_price(self, ticker):
         return self._price_cache.get(ticker, 0)
