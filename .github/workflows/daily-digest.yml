@@ -1,8 +1,9 @@
+```
 name: Daily Digest
 
 on:
   schedule:
-    - cron: '0 14 * * *'  # 매일 9:00 EST (14:00 UTC)
+    - cron: '0 14 * * *'
   workflow_dispatch:
 
 jobs:
@@ -37,8 +38,9 @@ jobs:
         run: |
           git config user.name 'Financial Bot'
           git config user.email 'bot@financial.ai'
-          git add -f pending_trades.json current_portfolio.json
+          git add -f pending_trades.json current_portfolio.json recommendation_history.json watch_state.json
           git diff --staged --quiet || git commit -m "📊 데이터 업데이트"
           git push
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
+```
