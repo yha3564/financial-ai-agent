@@ -343,4 +343,3 @@ if __name__ == "__main__":
     else:
         reporter = MarketCloseReport()
         reporter.run()
-
