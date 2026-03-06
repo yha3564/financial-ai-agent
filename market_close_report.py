@@ -690,12 +690,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ============================================================
 
 @flask_app.route(f'/webhook/{TELEGRAM_TOKEN}', methods=['POST'])
-async def webhook():
+def webhook():
     app = Application.builder().token(TELEGRAM_TOKEN).build()
     app.add_handler(CallbackQueryHandler(handle_callback))
 
     update = Update.de_json(request.get_json(), app.bot)
-    await app.process_update(update)
+    asyncio.run(app.process_update(update))
     return 'OK'
 
 
