@@ -15,7 +15,9 @@ jobs:
     
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN }}
       
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -34,3 +36,10 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python intraday_monitor.py
+      - name: Push data files
+        run: |
+          git config user.name 'Financial Bot'
+          git config user.email 'bot@financial.ai'
+          git add -f pending_trades.json seen_intraday.json
+          git diff --staged --quiet || git commit -m "📊 장중 데이터 업데이트"
+          git push
