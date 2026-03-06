@@ -22,14 +22,12 @@ class MarketCloseReport:
         self.est = pytz.timezone('America/New_York')
         self.now = datetime.now(self.est)
 
-        # 설정 로드
         with open('portfolio.yaml', 'r', encoding='utf-8') as f:
             self.config = yaml.safe_load(f)
 
         self.load_portfolio()
         self.build_ticker_name_map()
 
-        # 보유 자산 + 오늘 매도 티커 가격 배치 로드
         sold_tickers = [s['ticker'] for s in self.today_sells]
         all_tickers = list(set(
             list(self.my_holdings_tfsa1.keys()) +
@@ -57,14 +55,12 @@ class MarketCloseReport:
             self.my_holdings_tfsa2 = {}
             self.accumulated_cash = 0
 
-        # TFSA2 purpose 보강
         for asset in self.config.get('tfsa2_assets', []):
             ticker = asset['ticker']
             if ticker in self.my_holdings_tfsa2:
                 self.my_holdings_tfsa2[ticker]['purpose'] = asset.get('purpose', '')
                 self.my_holdings_tfsa2[ticker]['target_amount'] = asset.get('target_amount', 0)
 
-        # 오늘 매도 실현손익 로드
         self.today_sells = []
         try:
             with open('today_sold.json', 'r', encoding='utf-8') as f:
@@ -140,7 +136,6 @@ class MarketCloseReport:
         return self._prices.get(ticker, 0)
 
     def get_daily_return(self, ticker):
-        """오늘 수익률 (어제 대비)"""
         hist = self._hist.get(ticker)
         if hist is None or len(hist) < 2:
             return 0
@@ -154,6 +149,9 @@ class MarketCloseReport:
 
     # --------------------------------------------------------
     # 리포트 생성
+    # IMP-009: 보유자산 1줄 1종목 세로 나열 (원본 이미 구현됨)
+    # IMP-010: 대기현금 항목 제거 — IMP-006/007로 현금 항상 0
+    # IMP-003: 슬리피지 섹션 추가 (recommended_price 있을 때)
     # --------------------------------------------------------
     def generate_report(self):
         report = f"📊 장마감 브리핑\n🕐 {self.now.strftime('%Y-%m-%d %H:%M EST')}\n"
@@ -167,6 +165,11 @@ class MarketCloseReport:
             report += "📤 오늘 매도 실현손익\n"
             report += "=" * 37 + "\n"
             total_realized = 0
+
+            # IMP-003: 슬리피지 계산 (recommended_price 있을 때)
+            has_slippage = any(s.get('recommended_price') for s in self.today_sells)
+            total_slippage = 0
+
             for s in self.today_sells:
                 ticker = s['ticker']
                 name = self.ticker_names.get(ticker, ticker)
@@ -183,10 +186,27 @@ class MarketCloseReport:
                 report += f"{ticker} ({name}) {type_label}매도\n"
                 report += f"{shares}주 @${sell_price:.2f} = ${sell_value:.2f}\n"
                 report += f"평균단가 ${avg_price:.2f} → 매도가 ${sell_price:.2f}\n"
-                report += f"실현손익: {profit:+.2f}$ ({profit_pct:+.2f}%) {profit_emoji}\n\n"
+                report += f"실현손익: {profit:+.2f}$ ({profit_pct:+.2f}%) {profit_emoji}\n"
+
+                # IMP-003: 슬리피지 표시
+                recommended_price = s.get('recommended_price')
+                if recommended_price and recommended_price > 0:
+                    slippage = sell_price - recommended_price
+                    slippage_dollar = slippage * shares
+                    total_slippage += slippage_dollar
+                    slip_emoji = "🟢" if slippage >= 0 else "🔴"
+                    report += f"슬리피지: 추천가 ${recommended_price:.2f} → 체결가 ${sell_price:.2f} ({slippage:+.2f}$/주 × {shares}주 = {slippage_dollar:+.2f}$) {slip_emoji}\n"
+
+                report += "\n"
 
             total_emoji = "🟢" if total_realized >= 0 else "🔴"
             report += f"실현손익 합계: {total_realized:+.2f}$ {total_emoji}\n"
+
+            # IMP-003: 총 슬리피지
+            if has_slippage:
+                slip_emoji = "🟢" if total_slippage >= 0 else "🔴"
+                report += f"슬리피지 합계: {total_slippage:+.2f}$ {slip_emoji}\n"
+
             report += "=" * 37 + "\n"
 
         # TFSA 1
@@ -251,7 +271,7 @@ class MarketCloseReport:
 
                 name = self.ticker_names.get(ticker, ticker)
                 purpose_label = "여자친구 자금" if "girlfriend" in purpose else "어머님 자금" if "mother" in purpose else ""
-                
+
                 daily_emoji = "🟢" if daily_pct >= 0 else "🔴"
                 profit_emoji = "🟢" if profit_pct >= 0 else "🔴"
 
@@ -260,7 +280,6 @@ class MarketCloseReport:
                 report += f"오늘: {daily_pct:+.2f}% ({daily_dollar:+.2f}$) {daily_emoji}\n"
                 report += f"수익: {profit_pct:+.2f}% {profit_emoji}\n"
 
-                # 어머님 목표 달성률
                 if target > 0:
                     progress = value / target * 100
                     report += f"목표: ${value:.0f} / ${target:.0f} ({progress:.1f}%)\n"
@@ -271,13 +290,11 @@ class MarketCloseReport:
             report += f"소계: ${tfsa2_total:.2f}  오늘 {tfsa2_daily_pct:+.2f}% {daily_emoji}\n"
             report += "=" * 37 + "\n"
 
-        # 현금
-        if self.accumulated_cash > 0:
-            report += f"💵 대기 현금: ${self.accumulated_cash:.2f}\n"
-            report += "=" * 37 + "\n"
+        # IMP-010: 대기현금 섹션 제거 — 현금은 항상 0 (IMP-006/007로 즉시 재투자)
+        # 기존: if self.accumulated_cash > 0: report += "💵 대기 현금: ..."
 
         # 전체 요약
-        grand_total = tfsa1_total + tfsa2_total + self.accumulated_cash
+        grand_total = tfsa1_total + tfsa2_total  # 현금 제외 (항상 0)
         total_daily = tfsa1_daily_dollar + tfsa2_daily_dollar
         total_daily_pct = total_daily / grand_total * 100 if grand_total > 0 else 0
         daily_emoji = "🟢" if total_daily >= 0 else "🔴"
