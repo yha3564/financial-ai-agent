@@ -29,6 +29,35 @@ RENDER_URL = (
 
 est = pytz.timezone('America/New_York')
 
+def read_github_file(filename):
+    """GitHub repo에서 JSON 파일 읽기"""
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{filename}"
+    headers = {'Authorization': f'token {GH_TOKEN}', 'Accept': 'application/vnd.github.v3.raw'}
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code == 200:
+            return json.loads(resp.text)
+    except:
+        pass
+    return None
+
+def write_github_file(filename, data, message="Update"):
+    """GitHub repo에 JSON 파일 쓰기"""
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{filename}"
+    headers = {'Authorization': f'token {GH_TOKEN}'}
+    
+    # 기존 파일 SHA 가져오기
+    resp = requests.get(url, headers=headers, timeout=10)
+    sha = resp.json().get('sha', '') if resp.status_code == 200 else ''
+    
+    import base64
+    content = base64.b64encode(json.dumps(data, indent=2, ensure_ascii=False).encode()).decode()
+    
+    payload = {'message': message, 'content': content}
+    if sha:
+        payload['sha'] = sha
+    
+    requests.put(url, headers=headers, json=payload, timeout=10)
 
 # ============================================================
 # 미니앱 HTML
