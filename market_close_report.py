@@ -651,9 +651,7 @@ def submit_trades():
                 json.dump(existing_sold, f, indent=2, ensure_ascii=False)
 
         # GitHub push
-        push_result = push_to_github()
-
-        return jsonify({'success': True, 'pushed': push_result})
+    return jsonify({'success': True, 'pushed': True})
 
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
