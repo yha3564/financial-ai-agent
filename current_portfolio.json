@@ -1,0 +1,42 @@
+{
+  "tfsa1": {
+    "QQC.TO": {
+      "shares": 2.435,
+      "avg_price": 40.68
+    },
+    "QQQM": {
+      "shares": 0.5068,
+      "avg_price": 253.82
+    },
+    "VFV.TO": {
+      "shares": 0.8855,
+      "avg_price": 167.69
+    },
+    "VOO": {
+      "shares": 0.3919,
+      "avg_price": 628.99
+    },
+    "XETM.TO": {
+      "shares": 2.0921,
+      "avg_price": 88.9
+    }
+  },
+  "tfsa2": {
+    "CASH.TO": {
+      "shares": 20.6387,
+      "avg_price": 50.0,
+      "purpose": "girlfriend events",
+      "target_amount": 0
+    },
+    "XEI.TO": {
+      "shares": 42.4335,
+      "avg_price": 35.36,
+      "purpose": "mother's fund $10,000",
+      "target_amount": 10000
+    }
+  },
+  "accumulated_cash": 100,
+  "last_cash_added": "",
+  "date": "2026-03-06",
+  "time": "01:41"
+}
