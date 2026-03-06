@@ -494,8 +494,9 @@ def submit_trades():
         actual_shares = data.get('shares', {})
 
         # 포트폴리오 로드
-        with open('current_portfolio.json', 'r') as f:
-            portfolio = json.load(f)
+        portfolio = read_github_file('current_portfolio.json')
+        if not portfolio:
+            return jsonify({'success': False, 'error': 'portfolio not found'}), 404
 
         now = datetime.now(est)
 
