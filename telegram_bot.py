@@ -576,9 +576,16 @@ def submit_trades():
         portfolio['date'] = now.strftime('%Y-%m-%d')
         portfolio['time'] = now.strftime('%H:%M')
 
-        # 저장
-        with open('current_portfolio.json', 'w') as f:
-            json.dump(portfolio, f, indent=2, ensure_ascii=False)
+        # GitHub에 저장
+        write_github_file('current_portfolio.json', portfolio, '💼 포트폴리오 업데이트')
+
+        # 오늘 매도 실현손익 저장
+        if sold_history:
+            existing_sold = read_github_file('today_sold.json') or {}
+            if existing_sold.get('date') != now.strftime('%Y-%m-%d'):
+                existing_sold = {'date': now.strftime('%Y-%m-%d'), 'sells': []}
+            existing_sold['sells'].extend(sold_history)
+            write_github_file('today_sold.json', existing_sold, '📈 매도 기록 업데이트')
 
         # 오늘 매도 실현손익 저장
         if sold_history:
