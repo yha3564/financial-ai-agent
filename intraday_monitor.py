@@ -875,8 +875,27 @@ Rules:
             raise
 
 
-if __name__ == "__main__":
-    monitor = IntradayMonitor()
-    monitor.run()
+def is_market_open():
+    est = pytz.timezone('America/New_York')
+    now = datetime.now(est)
+    if now.weekday() >= 5:
+        print(f"📅 주말 ({now.strftime('%A')}) — 스킵")
+        return False
+    us_holidays = [
+        '2026-01-01', '2026-01-19', '2026-02-16', '2026-04-03',
+        '2026-05-25', '2026-06-19', '2026-07-03', '2026-09-07',
+        '2026-11-26', '2026-12-25',
+    ]
+    if now.strftime('%Y-%m-%d') in us_holidays:
+        print(f"📅 휴장일 — 스킵")
+        return False
+    return True
 
+
+if __name__ == "__main__":
+    if not is_market_open():
+        print("🛑 장 휴무 — 스킵")
+    else:
+        monitor = IntradayMonitor()
+        monitor.run()
 
