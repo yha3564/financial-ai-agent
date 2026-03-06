@@ -479,11 +479,10 @@ def miniapp():
 
 @flask_app.route('/api/pending_trades')
 def get_pending_trades():
-    try:
-        with open('pending_trades.json', 'r') as f:
-            return jsonify(json.load(f))
-    except:
-        return jsonify({}), 404
+    data = read_github_file('pending_trades.json')
+    if data:
+        return jsonify(data)
+    return jsonify({}), 404
 
 
 @flask_app.route('/api/submit_trades', methods=['POST'])
