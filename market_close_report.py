@@ -4,6 +4,7 @@ import hmac
 import hashlib
 import asyncio
 import subprocess
+import requests
 from datetime import datetime
 import pytz
 from flask import Flask, request, jsonify, render_template_string
@@ -691,11 +692,61 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @flask_app.route(f'/webhook/{TELEGRAM_TOKEN}', methods=['POST'])
 def webhook():
-    app = Application.builder().token(TELEGRAM_TOKEN).build()
-    app.add_handler(CallbackQueryHandler(handle_callback))
+    data = request.get_json()
+    if not data:
+        return 'OK'
 
-    update = Update.de_json(request.get_json(), app.bot)
-    asyncio.run(app.process_update(update))
+    # callback_query만 처리
+    callback_query = data.get('callback_query')
+    if not callback_query:
+        return 'OK'
+
+    callback_data = callback_query.get('data', '')
+    callback_id = callback_query['id']
+    message = callback_query.get('message', {})
+    chat_id = message.get('chat', {}).get('id')
+    message_id = message.get('message_id')
+
+    bot_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
+    now_str = datetime.now(est).strftime('%H:%M EST')
+
+    # answer callback query
+    requests.post(f"{bot_url}/answerCallbackQuery", json={'callback_query_id': callback_id})
+
+    if callback_data == 'trade_complete':
+        miniapp_url = f"{RENDER_URL}/miniapp"
+        keyboard = {'inline_keyboard': [[{
+            'text': '📝 체결가 입력',
+            'web_app': {'url': miniapp_url}
+        }]]}
+        requests.post(f"{bot_url}/editMessageReplyMarkup", json={
+            'chat_id': chat_id,
+            'message_id': message_id,
+            'reply_markup': keyboard
+        })
+
+    elif callback_data == 'trade_watch':
+        keyboard = {'inline_keyboard': [[{
+            'text': f'👀 관망 중 ({now_str})',
+            'callback_data': 'noop'
+        }]]}
+        requests.post(f"{bot_url}/editMessageReplyMarkup", json={
+            'chat_id': chat_id,
+            'message_id': message_id,
+            'reply_markup': keyboard
+        })
+
+    elif callback_data == 'trade_ignore':
+        keyboard = {'inline_keyboard': [[{
+            'text': f'❌ 무시됨 ({now_str})',
+            'callback_data': 'noop'
+        }]]}
+        requests.post(f"{bot_url}/editMessageReplyMarkup", json={
+            'chat_id': chat_id,
+            'message_id': message_id,
+            'reply_markup': keyboard
+        })
+
     return 'OK'
 
 
