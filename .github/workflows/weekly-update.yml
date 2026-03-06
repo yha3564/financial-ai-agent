@@ -2,7 +2,7 @@ name: Weekly Hot Stock Update
 
 on:
   schedule:
-    - cron: '0 4 * * 0'  # 매주 일요일 23:00 EST (04:00 UTC 월요일)
+    - cron: '0 4 * * 0'
   workflow_dispatch:
 
 jobs:
@@ -13,7 +13,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GH_TOKEN }}
       
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -34,8 +34,8 @@ jobs:
       
       - name: Commit changes
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
+          git config user.name 'Financial Bot'
+          git config user.email 'bot@financial.ai'
           git add portfolio.yaml
-          git diff --quiet && git diff --staged --quiet || git commit -m "Auto-update: Weekly hot stocks"
+          git diff --staged --quiet || git commit -m "Auto-update: Weekly hot stocks"
           git push
