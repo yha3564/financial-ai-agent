@@ -46,14 +46,12 @@ class PriceCache:
             close = df['Close'] if 'Close' in df.columns else df.xs('Close', axis=1, level=0)
 
             if isinstance(close, pd.Series):
-                # 티커 1개
                 ticker = tickers[0]
                 data = close.dropna()
                 if len(data) > 0:
                     self._price_cache[ticker] = float(data.iloc[-1])
                     self._hist_cache[ticker] = pd.DataFrame({'Close': data})
             else:
-                # 여러 티커
                 for ticker in tickers:
                     try:
                         if ticker in close.columns:
@@ -71,7 +69,6 @@ class PriceCache:
             loaded = sum(1 for v in self._price_cache.values() if v > 0)
             print(f"✅ 가격 로드 완료 ({loaded}/{len(tickers)}개 성공)")
 
-            # 실패한 티커 개별 재시도
             failed = [t for t in tickers if self._price_cache.get(t, 0) == 0]
             if failed:
                 print(f"⚠️ {len(failed)}개 개별 재시도...")
@@ -121,7 +118,6 @@ class DailyDigest:
         self.telegram_chat_id = os.environ['TELEGRAM_CHAT_ID']
 
         self.groq = Groq(api_key=self.groq_api_key)
-        # Gemini 초기화 (API 키 있을 때만)
         self.gemini = None
         if self.gemini_api_key:
             try:
@@ -138,7 +134,6 @@ class DailyDigest:
         self.est = pytz.timezone('America/New_York')
         self.now = datetime.now(self.est)
 
-        # 설정 로드
         with open('portfolio.yaml', 'r', encoding='utf-8') as f:
             self.config = yaml.safe_load(f)
 
@@ -147,16 +142,13 @@ class DailyDigest:
         self.alternative_assets = [a['ticker'] for a in self.config.get('alternative_assets', [])]
         self.safe_assets = [a['ticker'] for a in self.config.get('safe_assets', [])]
 
-        # MER 맵 (ticker → mer)
         self.mer_map = {}
         for section in ['tfsa1_assets', 'tfsa2_assets', 'alternative_assets', 'safe_assets']:
             for asset in self.config.get(section, []):
                 self.mer_map[asset['ticker']] = asset.get('mer', 0.003)
 
-        # 포트폴리오 로드
         self.load_portfolio()
 
-        # 가격 캐시 초기화
         self.price_cache = PriceCache()
         all_tickers = list(set(
             list(self.my_holdings_tfsa1.keys()) +
@@ -167,10 +159,7 @@ class DailyDigest:
         self.price_cache.batch_download(all_tickers)
         self.all_tracked_assets = all_tickers
 
-        # 티커 이름 맵
         self.build_ticker_name_map()
-
-        # 매월 1일 현금 체크
         self.check_monthly_cash()
 
         print(f"✅ 초기화 완료 - {self.now.strftime('%Y-%m-%d %H:%M %Z')}")
@@ -210,7 +199,6 @@ class DailyDigest:
             self.last_cash_added = ''
             self.save_portfolio()
 
-        # TFSA2 purpose 정보 보강
         for asset in self.config.get('tfsa2_assets', []):
             ticker = asset['ticker']
             if ticker in self.my_holdings_tfsa2:
@@ -268,14 +256,13 @@ class DailyDigest:
         return 0
 
     # --------------------------------------------------------
-    # 뉴스 수집 (NewsAPI + RSS + 크롤링)
+    # 뉴스 수집
     # --------------------------------------------------------
     def collect_all_news(self):
         print("\n📰 뉴스 수집 중...")
         all_news = []
         seen_urls = set()
 
-        # 1. NewsAPI
         for category in ['business', 'technology']:
             try:
                 response = requests.get(
@@ -301,7 +288,6 @@ class DailyDigest:
             except Exception as e:
                 print(f"   ❌ NewsAPI {category} 오류: {e}")
 
-        # 2. RSS 피드
         rss_feeds = [
             ('Reuters', 'https://feeds.reuters.com/reuters/businessNews'),
             ('AP News', 'https://feeds.apnews.com/apnews/business'),
@@ -315,9 +301,7 @@ class DailyDigest:
                     url = entry.get('link', '')
                     if url and url not in seen_urls:
                         seen_urls.add(url)
-                        # RSS는 본문 일부 제공
                         content = entry.get('summary', '') or entry.get('content', [{}])[0].get('value', '')
-                        # HTML 태그 제거
                         if content:
                             content = BeautifulSoup(content, 'html.parser').get_text()[:500]
                         all_news.append({
@@ -331,7 +315,6 @@ class DailyDigest:
             except Exception as e:
                 print(f"   ❌ RSS {source} 오류: {e}")
 
-        # 3. URL 크롤링 (본문 없는 것만)
         crawl_count = 0
         for news in all_news:
             if not news['content'] and news['url'] and crawl_count < 30:
@@ -340,7 +323,6 @@ class DailyDigest:
                                        headers={'User-Agent': 'Mozilla/5.0'})
                     if resp.status_code == 200:
                         soup = BeautifulSoup(resp.text, 'html.parser')
-                        # 본문 추출
                         for tag in soup(['script', 'style', 'nav', 'header', 'footer']):
                             tag.decompose()
                         paragraphs = soup.find_all('p')
@@ -372,10 +354,9 @@ class DailyDigest:
             json.dump({'news': [], 'date': self.now.strftime('%Y-%m-%d')}, f)
 
     # --------------------------------------------------------
-    # AI 뉴스 분석 (배치 처리 + Gemini 폴백)
+    # AI 뉴스 분석
     # --------------------------------------------------------
     def analyze_news_batch(self, news_batch):
-        """뉴스 10개씩 배치 분석"""
         assets_str = ", ".join(self.all_tracked_assets)
 
         news_text = ""
@@ -404,7 +385,6 @@ Rules:
 - neutral assets: skip entirely
 - Return ONLY valid JSON, no markdown"""
 
-        # Groq 시도
         try:
             response = self.groq.chat.completions.create(
                 messages=[{"role": "user", "content": prompt}],
@@ -418,7 +398,6 @@ Rules:
         except Exception as e:
             print(f"   ⚠️ Groq 오류: {e}, Gemini 폴백...")
 
-        # Gemini 폴백
         if not self.gemini:
             return {}
         try:
@@ -436,7 +415,6 @@ Rules:
             return {}
 
     def aggregate_asset_impacts(self, all_news):
-        """모든 뉴스를 배치로 분석해서 자산별 종합"""
         print("\n🧠 AI 뉴스 영향 분석 중 (배치 처리)...")
 
         asset_scores = {ticker: {'total': 0, 'confidences': [], 'reasons': [], 'count': 0}
@@ -497,7 +475,6 @@ Rules:
     # 장후 뉴스 요약 분석
     # --------------------------------------------------------
     def analyze_afterhours_summary(self, afterhours_news):
-        """장후 뉴스 전체 요약"""
         if not afterhours_news:
             return None
 
@@ -515,19 +492,19 @@ Rules:
   "bullish_count": 숫자,
   "bearish_count": 숫자,
   "neutral_count": 숫자,
-  "key_bullish": ["주요 호재 1", "주요 호재 2"],
-  "key_bearish": ["주요 악재 1"],
+  "key_bullish": [{{"headline": "주요 호재 1", "assets": ["TICKER1", "TICKER2"]}}, ...],
+  "key_bearish": [{{"headline": "주요 악재 1", "assets": ["TICKER1"]}}, ...],
   "summary": "전체 흐름 한 줄 요약"
 }}
 
-JSON만 반환."""
+JSON만 반환. key_bullish/key_bearish의 assets는 영향받는 보유자산 티커 목록."""
 
         try:
             response = self.groq.chat.completions.create(
                 messages=[{"role": "user", "content": prompt}],
                 model="llama-3.3-70b-versatile",
                 temperature=0.3,
-                max_tokens=500,
+                max_tokens=600,
             )
             text = response.choices[0].message.content
             text = text.replace('```json', '').replace('```', '').strip()
@@ -549,7 +526,7 @@ JSON만 반환."""
                 return None
 
     # --------------------------------------------------------
-    # 기술적 분석 (캐시 사용)
+    # 기술적 분석
     # --------------------------------------------------------
     def technical_analysis(self, ticker):
         try:
@@ -557,7 +534,6 @@ JSON만 반환."""
             if df.empty or len(df) < 20:
                 return {'signal': 'neutral', 'rsi': 50}
 
-            # pandas_ta_classic 사용
             df['rsi'] = ta.rsi(df['Close'], length=14)
             current_rsi = float(df['rsi'].iloc[-1])
 
@@ -593,14 +569,12 @@ JSON만 반환."""
             confidence = impact.get('confidence', 0.5)
             reasons = impact.get('reasons', [])
 
-            # 기술적 분석 보정
             tech = self.technical_analysis(ticker)
             if tech['signal'] == 'sell' and weighted_score > 0:
                 weighted_score *= 0.8
             elif tech['signal'] == 'buy' and weighted_score < 0:
                 weighted_score *= 0.8
 
-            # 매수/매도 추천 시 수수료 계산 (뉴스 점수와 분리)
             mer = self.mer_map.get(ticker, 0.003)
             is_usd = not ticker.endswith('.TO')
             net_cost = (fx_fee * 2 if is_usd else 0) + (mer * 3 / 12)
@@ -611,7 +585,7 @@ JSON만 반환."""
                 'magnitude': magnitude,
                 'confidence': confidence,
                 'net_cost': net_cost,
-                'net_score': weighted_score - net_cost,  # 수수료 반영 순점수
+                'net_score': weighted_score - net_cost,
                 'reasons': reasons,
                 'technical': tech,
                 'news_count': impact.get('news_count', 0)
@@ -623,6 +597,9 @@ JSON만 반환."""
 
     # --------------------------------------------------------
     # 추천 생성
+    # IMP-006/007: 모든 매도 후 즉시 대안자산 재투자 (현금 대기 금지)
+    #              예외: 스캔한 모든 alternative_assets 점수 음수 시만 현금 보유
+    # IMP-002:     각 액션에 recommended_price / recommended_at 저장
     # --------------------------------------------------------
     def generate_recommendations(self, rankings):
         print("\n💡 추천 생성 중...")
@@ -632,6 +609,7 @@ JSON만 반환."""
         tfsa2_rules = self.trading_rules.get('tfsa2', {})
         concentration_threshold = tfsa1_rules.get('concentration_threshold', 0.10)
         alert_threshold = self.config.get('ranking_rules', {}).get('alert_threshold', 0.15)
+        recommended_at = self.now.isoformat()
 
         # ── TFSA 1 ──
         tfsa1_actions = []
@@ -642,7 +620,7 @@ JSON만 반환."""
         half_threshold = tfsa1_rules.get('half_sell_threshold', 0.25)
         full_threshold = tfsa1_rules.get('full_sell_threshold', 0.35)
 
-        # ── STEP 1: 매도 판단 ──
+        # STEP 1: 매도 판단
         for ticker, holding in self.my_holdings_tfsa1.items():
             rank = rankings_map.get(ticker, {})
             score = rank.get('weighted_score', 0)
@@ -651,29 +629,30 @@ JSON만 반환."""
             current_value = shares * current_price
 
             if score <= -full_threshold:
-                # 전량 매도
                 tfsa1_actions.append({
                     'action': 'SELL', 'type': 'full',
                     'ticker': ticker, 'shares': shares,
                     'price': current_price, 'value': current_value,
-                    'score': score, 'expected_pct': score * 100
+                    'score': score, 'expected_pct': score * 100,
+                    'recommended_price': current_price,   # IMP-002
+                    'recommended_at': recommended_at       # IMP-002
                 })
                 sell_proceeds += current_value
 
             elif score <= -half_threshold:
-                # 절반 매도
                 sell_shares = round(shares * 0.5, 4)
                 sell_value = sell_shares * current_price
                 tfsa1_actions.append({
                     'action': 'SELL', 'type': 'half',
                     'ticker': ticker, 'shares': sell_shares,
                     'price': current_price, 'value': sell_value,
-                    'score': score, 'expected_pct': score * 100
+                    'score': score, 'expected_pct': score * 100,
+                    'recommended_price': current_price,
+                    'recommended_at': recommended_at
                 })
                 sell_proceeds += sell_value
 
             elif score <= -partial_threshold:
-                # 30~50% 부분 매도
                 sell_pct = 0.3 + (abs(score) - partial_threshold) / (half_threshold - partial_threshold) * 0.2
                 sell_shares = round(shares * sell_pct, 4)
                 sell_value = sell_shares * current_price
@@ -681,15 +660,16 @@ JSON만 반환."""
                     'action': 'SELL', 'type': 'partial',
                     'ticker': ticker, 'shares': sell_shares,
                     'price': current_price, 'value': sell_value,
-                    'score': score, 'expected_pct': score * 100
+                    'score': score, 'expected_pct': score * 100,
+                    'recommended_price': current_price,
+                    'recommended_at': recommended_at
                 })
                 sell_proceeds += sell_value
 
         available_cash += sell_proceeds
         sold_tickers = [a['ticker'] for a in tfsa1_actions if a['action'] == 'SELL' and a['type'] == 'full']
 
-        # ── STEP 2: 매수 후보 — 전체 rankings에서 score > alert_threshold 상위 5개 ──
-        # 보유 자산 포함, 이미 전량매도 예정인 것만 제외
+        # STEP 2: 매수 후보
         buy_candidates = [
             r for r in rankings
             if r['weighted_score'] > alert_threshold
@@ -698,8 +678,13 @@ JSON만 반환."""
         ]
         buy_candidates = sorted(buy_candidates, key=lambda x: x['net_score'], reverse=True)[:5]
 
-        # ── STEP 3: 현금이 있으면 매수 ──
-        if available_cash > 0 and buy_candidates:
+        # IMP-006/007: 매도금이 있을 때 반드시 재투자
+        # 매수 후보가 없거나 모두 음수이면 현금 보유 (예외)
+        has_positive_candidate = any(r['weighted_score'] > 0 for r in rankings
+                                     if r['ticker'] not in sold_tickers
+                                     and self.get_price(r['ticker']) > 0)
+
+        if available_cash > 0 and buy_candidates and has_positive_candidate:
             top1 = buy_candidates[0]
             if len(buy_candidates) >= 2:
                 diff = top1['weighted_score'] - buy_candidates[1]['weighted_score']
@@ -719,17 +704,15 @@ JSON만 반환."""
                         'price': price,
                         'value': per_amount,
                         'score': candidate['weighted_score'],
-                        'expected_pct': candidate['magnitude'] * 100
+                        'expected_pct': candidate['magnitude'] * 100,
+                        'recommended_price': price,     # IMP-002
+                        'recommended_at': recommended_at # IMP-002
                     })
 
-        # ── STEP 4: 스왑 판단 — 현금 유무 관계없이 항상 실행 ──
-        # 이미 BUY 액션이 있으면 스왑 불필요
-        # 보유 자산 최하위 score vs 전체 rankings 최상위 후보 비교
+        # STEP 4: 스왑 판단
         has_buy = any(a['action'] == 'BUY' for a in tfsa1_actions)
-        if not has_buy and buy_candidates:
+        if not has_buy and buy_candidates and has_positive_candidate:
             top1 = buy_candidates[0]
-            # 전량매도 예정 제외, top1 자신 제외한 보유 자산 전체 수집
-            # rankings에 없는 보유 자산은 score=0으로 처리
             held = []
             for t in self.my_holdings_tfsa1:
                 if t in sold_tickers or t == top1['ticker']:
@@ -745,7 +728,6 @@ JSON만 반환."""
                     })
             if held:
                 weakest = min(held, key=lambda x: x['weighted_score'])
-                # top1이 weakest보다 alert_threshold 이상 좋으면 교체
                 if top1['weighted_score'] - weakest['weighted_score'] >= alert_threshold:
                     w_ticker = weakest['ticker']
                     w_holding = self.my_holdings_tfsa1.get(w_ticker, {})
@@ -758,11 +740,12 @@ JSON만 반환."""
                         'ticker': w_ticker, 'shares': w_shares,
                         'price': w_price, 'value': w_value,
                         'score': weakest['weighted_score'],
-                        'expected_pct': weakest['magnitude'] * 100
+                        'expected_pct': weakest['magnitude'] * 100,
+                        'recommended_price': w_price,
+                        'recommended_at': recommended_at
                     })
                     b_price = self.get_price(top1['ticker'])
                     if b_price > 0:
-                        # 스왑 매도금 + 기존 현금 합산해서 매수
                         total_buy = w_value + available_cash
                         b_shares = round(total_buy / b_price, 4)
                         tfsa1_actions.append({
@@ -772,10 +755,12 @@ JSON만 반환."""
                             'price': b_price,
                             'value': total_buy,
                             'score': top1['weighted_score'],
-                            'expected_pct': top1['magnitude'] * 100
+                            'expected_pct': top1['magnitude'] * 100,
+                            'recommended_price': b_price,
+                            'recommended_at': recommended_at
                         })
 
-        # ── TFSA 2 (목적별 분리) ──
+        # ── TFSA 2 ──
         tfsa2_actions = {}
         full_threshold_t2 = tfsa2_rules.get('full_sell_threshold', 0.30)
         safe_rankings = [r for r in rankings if r['ticker'] in self.safe_assets]
@@ -791,7 +776,6 @@ JSON만 반환."""
 
             actions = []
 
-            # 현재 보유 자산보다 더 좋은 게 있는지 확인
             best_alternative = None
             for safe in safe_rankings:
                 if safe['ticker'] != ticker and safe['net_score'] > score + 0.05:
@@ -799,14 +783,15 @@ JSON만 반환."""
                     break
 
             if score <= -full_threshold_t2 and best_alternative:
-                # 전량 교체
                 best_price = self.get_price(best_alternative['ticker'])
                 buy_shares = round(current_value / best_price, 4) if best_price > 0 else 0
                 actions.append({
                     'action': 'SELL', 'type': 'full',
                     'ticker': ticker, 'shares': shares,
                     'price': current_price, 'value': current_value,
-                    'score': score, 'expected_pct': score * 100
+                    'score': score, 'expected_pct': score * 100,
+                    'recommended_price': current_price,
+                    'recommended_at': recommended_at
                 })
                 actions.append({
                     'action': 'BUY',
@@ -815,17 +800,20 @@ JSON만 반환."""
                     'price': best_price,
                     'value': current_value,
                     'score': best_alternative['weighted_score'],
-                    'expected_pct': best_alternative['magnitude'] * 100
+                    'expected_pct': best_alternative['magnitude'] * 100,
+                    'recommended_price': best_price,
+                    'recommended_at': recommended_at
                 })
             elif best_alternative and best_alternative['net_score'] - score > 0.15:
-                # 더 나은 대안이 있으면 교체 추천
                 best_price = self.get_price(best_alternative['ticker'])
                 buy_shares = round(current_value / best_price, 4) if best_price > 0 else 0
                 actions.append({
                     'action': 'SELL', 'type': 'full',
                     'ticker': ticker, 'shares': shares,
                     'price': current_price, 'value': current_value,
-                    'score': score, 'expected_pct': score * 100
+                    'score': score, 'expected_pct': score * 100,
+                    'recommended_price': current_price,
+                    'recommended_at': recommended_at
                 })
                 actions.append({
                     'action': 'BUY',
@@ -834,7 +822,9 @@ JSON만 반환."""
                     'price': best_price,
                     'value': current_value,
                     'score': best_alternative['weighted_score'],
-                    'expected_pct': best_alternative['magnitude'] * 100
+                    'expected_pct': best_alternative['magnitude'] * 100,
+                    'recommended_price': best_price,
+                    'recommended_at': recommended_at
                 })
             else:
                 actions.append({'action': 'HOLD', 'ticker': ticker})
@@ -854,25 +844,55 @@ JSON만 반환."""
 
     # --------------------------------------------------------
     # 텔레그램 리포트 생성
+    # IMP-005: 장후 뉴스 헤드라인 아래 "   → 영향자산" 들여쓰기 구조
+    # IMP-011: 매수 섹션 "💰 매수가능" + 자산명(풀네임) + 주수@가격 포맷
+    # IMP-013: TFSA 2 항상 표시 (HOLD면 "전체 유지" 출력)
     # --------------------------------------------------------
     def format_telegram_report(self, recommendations, afterhours_summary=None):
         report = f"📊 데일리 브리핑\n🕐 {self.now.strftime('%Y-%m-%d %H:%M EST')}\n"
         report += "=" * 37 + "\n"
 
+        # IMP-005: 뉴스 섹션 — 헤드라인 아래 영향자산 들여쓰기
         if afterhours_summary:
-            conclusion_emoji = "🟢" if "호재" in afterhours_summary.get('conclusion', '') else "🔴" if "악재" in afterhours_summary.get('conclusion', '') else "⚪"
-            report += f"📌 장후 뉴스 요약\n"
-            report += f"{conclusion_emoji} {afterhours_summary.get('conclusion', '')} | 호재 {afterhours_summary.get('bullish_count', 0)}건 | 악재 {afterhours_summary.get('bearish_count', 0)}건\n"
+            conclusion = afterhours_summary.get('conclusion', '')
+            conclusion_emoji = "🟢" if "호재" in conclusion else "🔴" if "악재" in conclusion else "⚪"
+            bullish_count = afterhours_summary.get('bullish_count', 0)
+            bearish_count = afterhours_summary.get('bearish_count', 0)
+            report += f"{conclusion_emoji} {conclusion} | 호재 {bullish_count}건 | 악재 {bearish_count}건\n"
 
-            if afterhours_summary.get('key_bearish'):
-                report += "🔴 주요 악재\n"
-                for b in afterhours_summary['key_bearish']:
-                    report += f"• {b}\n"
+            # key_bullish: 헤드라인 + 영향자산 들여쓰기
+            for item in afterhours_summary.get('key_bullish', []):
+                if isinstance(item, dict):
+                    headline = item.get('headline', '')
+                    assets = item.get('assets', [])
+                else:
+                    headline = item
+                    assets = []
+                report += f"🟢 {headline}\n"
+                if assets:
+                    asset_names = " · ".join(
+                        f"{t}({self.ticker_names.get(t, t)})" for t in assets
+                        if t in self.my_holdings_tfsa1 or t in self.my_holdings_tfsa2
+                    )
+                    if asset_names:
+                        report += f"   → {asset_names} 수혜\n"
 
-            if afterhours_summary.get('key_bullish'):
-                report += "🟢 주요 호재\n"
-                for b in afterhours_summary['key_bullish']:
-                    report += f"• {b}\n"
+            for item in afterhours_summary.get('key_bearish', []):
+                if isinstance(item, dict):
+                    headline = item.get('headline', '')
+                    assets = item.get('assets', [])
+                else:
+                    headline = item
+                    assets = []
+                report += f"🔴 {headline}\n"
+                if assets:
+                    asset_names = " · ".join(
+                        f"{t}({self.ticker_names.get(t, t)})" for t in assets
+                        if t in self.my_holdings_tfsa1 or t in self.my_holdings_tfsa2
+                    )
+                    if asset_names:
+                        report += f"   → {asset_names} 직격\n"
+
             report += "=" * 37 + "\n"
 
         # TFSA 1
@@ -883,45 +903,53 @@ JSON만 반환."""
         existing_cash = self.accumulated_cash
         sell_total = sum(s['value'] for s in sells)
 
-        tfsa2_has_action_check = any(
-            any(a['action'] != 'HOLD' for a in data['actions'])
-            for data in recommendations['tfsa2'].values()
-        )
-
         report += "💡 오늘 추천\n"
         report += "=" * 37 + "\n"
 
-        if not sells and not buys and not tfsa2_has_action_check:
-            report += "→ 전체 유지\n"
-            return report
-
-        if sells or buys:
-            report += "TFSA 1\n"
-            report += f"💵 보유 현금: ${existing_cash:.0f}\n"
+        if not sells and not buys:
+            report += "💡 TFSA 1\n→ 변경 없음\n"
+        else:
+            report += "💡 TFSA 1\n"
 
             for s in sells:
                 name = self.ticker_names.get(s['ticker'], s['ticker'])
                 type_label = "전량" if s['type'] == 'full' else "절반" if s['type'] == 'half' else "부분"
                 report += f"\n📤 {type_label} 매도\n{s['ticker']} ({name})\n{s['shares']}주 @${s['price']:.2f} = ${s['value']:.2f}\n"
 
+            # IMP-011: 매수 포맷 통일
             if buys:
-                if sell_total > 0:
-                    report += f"\n💰 매수가능: ${existing_cash + sell_total:.0f} (현금 ${existing_cash:.0f} + 매도 ${sell_total:.0f})\n"
+                total_available = existing_cash + sell_total
+                if sell_total > 0 and existing_cash > 0:
+                    report += f"\n💰 매수가능: ${total_available:.0f} (현금 ${existing_cash:.0f} + 매도 ${sell_total:.0f})\n"
+                elif sell_total > 0:
+                    report += f"\n💰 매수가능: ${total_available:.0f}\n"
                 else:
                     report += f"\n💰 매수가능: ${existing_cash:.0f}\n"
+
                 for b in buys:
                     name = self.ticker_names.get(b['ticker'], b['ticker'])
-                    report += f"\n📥 매수\n{b['ticker']} ({name})\n{b['shares']}주 @${b['price']:.2f} = ${b['value']:.2f}  ({b['expected_pct']:+.1f}% 예상)\n"
+                    report += f"{b['ticker']} ({name})\n{b['shares']}주 @${b['price']:.2f} = ${b['value']:.2f}  ({b['expected_pct']:+.1f}% 예상)\n"
 
-            report += "=" * 37 + "\n"
+        report += "=" * 37 + "\n"
 
-        # TFSA 2 - HOLD면 섹션 자체 생략
-        if tfsa2_has_action_check:
-            report += "TFSA 2\n"
+        # IMP-013: TFSA 2 항상 표시
+        report += "💡 TFSA 2\n"
+        tfsa2_has_action = any(
+            any(a['action'] != 'HOLD' for a in data['actions'])
+            for data in recommendations['tfsa2'].values()
+        )
+
+        if not tfsa2_has_action:
+            report += "→ 전체 유지\n"
+        else:
             for ticker, data in recommendations['tfsa2'].items():
                 actions = data['actions']
                 if all(a['action'] == 'HOLD' for a in actions):
-                    continue  # HOLD만 있으면 생략
+                    name = self.ticker_names.get(ticker, ticker)
+                    purpose = data['purpose']
+                    purpose_label = "여자친구 자금" if "girlfriend" in purpose else "어머님 자금" if "mother" in purpose else purpose
+                    report += f"{ticker} ({name}) | {purpose_label}: 유지\n"
+                    continue
 
                 purpose = data['purpose']
                 purpose_label = "여자친구 자금" if "girlfriend" in purpose else "어머님 자금" if "mother" in purpose else purpose
@@ -935,10 +963,9 @@ JSON만 반환."""
                         sell_val = action['value']
                     elif action['action'] == 'BUY':
                         buy_name = self.ticker_names.get(action['ticker'], action['ticker'])
-                        if sell_val > 0:
-                            report += f"💰 매도금: ${sell_val:.0f}\n"
-                            sell_val = 0
-                        report += f"📥 매수\n{action['ticker']} ({buy_name})\n{action['shares']}주 @${action['price']:.2f} = ${action['value']:.2f}  ({action['expected_pct']:+.1f}% 예상)\n"
+                        report += f"💰 매수가능: ${sell_val:.0f}\n"
+                        report += f"{action['ticker']} ({buy_name})\n{action['shares']}주 @${action['price']:.2f} = ${action['value']:.2f}  ({action['expected_pct']:+.1f}% 예상)\n"
+                        sell_val = 0
 
         return report
 
@@ -949,7 +976,6 @@ JSON만 반환."""
         bot = Bot(token=self.telegram_token)
         try:
             if with_buttons and pending_trades:
-                # 거래 내역을 JSON으로 저장 (미니앱에서 사용)
                 with open('pending_trades.json', 'w') as f:
                     json.dump(pending_trades, f)
 
@@ -982,35 +1008,28 @@ JSON만 반환."""
             print("🤖 Daily Digest v4.0 시작")
             print("=" * 50)
 
-            # 장후 뉴스 로드
             afterhours_news = self.load_afterhours_news()
             afterhours_summary = self.analyze_afterhours_summary(afterhours_news) if afterhours_news else None
 
-            # 현재 뉴스 수집
             all_news = self.collect_all_news()
             if not all_news:
                 asyncio.run(self.send_telegram("📭 오늘은 관련 뉴스가 없습니다."))
                 return
 
-            # 분석
             asset_impacts = self.aggregate_asset_impacts(all_news)
             rankings = self.create_rankings(asset_impacts)
             recommendations = self.generate_recommendations(rankings)
 
-            # 리포트 생성
             report = self.format_telegram_report(recommendations, afterhours_summary)
 
-            # pending_trades 생성 (버튼 탭 시 사용)
             pending_trades = {
                 'tfsa1': recommendations['tfsa1'],
                 'tfsa2': recommendations['tfsa2'],
                 'timestamp': self.now.isoformat()
             }
 
-            # 전송 (버튼 포함)
             asyncio.run(self.send_telegram(report, with_buttons=True, pending_trades=pending_trades))
 
-            # 장후 뉴스 초기화
             if afterhours_news:
                 self.clear_afterhours_news()
 
