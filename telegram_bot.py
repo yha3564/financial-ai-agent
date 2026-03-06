@@ -10,6 +10,17 @@ import pytz
 from flask import Flask, request, jsonify, render_template_string
 from telegram import Bot
 
+# Gemini Vision (스크린샷 인식)
+try:
+    from google import genai as genai_new
+    USE_NEW_GENAI = True
+except ImportError:
+    try:
+        import google.generativeai as genai
+        USE_NEW_GENAI = False
+    except:
+        USE_NEW_GENAI = None
+
 # ============================================================
 # Flask 앱 (미니앱 서빙 + 웹훅)
 # ============================================================
@@ -19,7 +30,7 @@ TELEGRAM_TOKEN = os.environ['TELEGRAM_BOT_TOKEN']
 TELEGRAM_CHAT_ID = os.environ['TELEGRAM_CHAT_ID']
 GH_TOKEN = os.environ['GH_TOKEN']
 GITHUB_REPO = os.environ.get('GITHUB_REPOSITORY', 'yha3564/financial-ai-agent')
-# Render's built-in env var is RENDER_EXTERNAL_URL; fall back to custom RENDER_URL
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 RENDER_URL = (
     os.environ.get('RENDER_EXTERNAL_URL') or
     os.environ.get('RENDER_URL') or
@@ -27,6 +38,9 @@ RENDER_URL = (
 ).rstrip('/')
 
 est = pytz.timezone('America/New_York')
+
+# 유저 상태 (메모리, 재시작 시 초기화)
+user_state = {}
 
 def read_github_file(filename):
     """GitHub repo에서 JSON 파일 읽기"""
@@ -56,6 +70,94 @@ def write_github_file(filename, data, message="Update"):
         payload['sha'] = sha
     
     requests.put(url, headers=headers, json=payload, timeout=10)
+
+
+# ============================================================
+# Gemini Vision (스크린샷 인식)
+# ============================================================
+def analyze_screenshot(image_base64):
+    """Gemini Vision으로 체결/배당 스크린샷 분석"""
+    if not GEMINI_API_KEY:
+        return None
+    try:
+        prompt = """이 Wealthsimple 스크린샷에서 다음 정보를 추출해주세요.
+JSON으로만 응답하세요 (다른 텍스트 없이):
+{
+  "type": "trade" 또는 "dividend",
+  "ticker": "종목코드",
+  "shares": 주수(숫자),
+  "price": 가격(숫자),
+  "amount": 총액(숫자),
+  "action": "buy" 또는 "sell" 또는 "dividend"
+}
+인식 불가 시: {"type": "unknown"}"""
+
+        if USE_NEW_GENAI:
+            client = genai_new.Client(api_key=GEMINI_API_KEY)
+            response = client.models.generate_content(
+                model='gemini-2.0-flash',
+                contents=[
+                    {'inline_data': {'mime_type': 'image/jpeg', 'data': image_base64}},
+                    prompt
+                ]
+            )
+        elif USE_NEW_GENAI is False:
+            genai.configure(api_key=GEMINI_API_KEY)
+            model = genai.GenerativeModel('gemini-2.0-flash')
+            response = model.generate_content([
+                {'inline_data': {'mime_type': 'image/jpeg', 'data': image_base64}},
+                prompt
+            ])
+        else:
+            return None
+
+        text = response.text.strip()
+        # JSON 추출
+        if '```' in text:
+            text = text.split('```')[1].replace('json', '').strip()
+        return json.loads(text)
+    except Exception as e:
+        print(f"⚠️ 스크린샷 분석 오류: {e}")
+        return None
+
+
+def send_telegram_msg(chat_id, text, keyboard=None):
+    """텔레그램 메시지 전송 헬퍼"""
+    bot_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
+    payload = {'chat_id': chat_id, 'text': text}
+    if keyboard:
+        payload['reply_markup'] = json.dumps(keyboard)
+    requests.post(f"{bot_url}/sendMessage", json=payload)
+
+
+def get_investment_recommendation(cash_amount):
+    """현금으로 투자 추천 생성 (pending_trades 기반)"""
+    pending = read_github_file('pending_trades.json')
+    if not pending:
+        return f"💵 현금 ${cash_amount:.2f} 적립\n📊 다음 브리핑에서 추천이 나옵니다."
+
+    # TFSA1 매수 후보에서 최고 점수 찾기
+    tfsa1 = pending.get('tfsa1', [])
+    buys = [a for a in tfsa1 if a.get('action') == 'BUY']
+    if buys:
+        best = max(buys, key=lambda x: x.get('score', 0))
+        ticker = best['ticker']
+        price = best['price']
+        shares = round(cash_amount / price, 4) if price > 0 else 0
+        pct = best.get('expected_pct', 0)
+        return (f"📊 투자 추천:\n"
+                f"{ticker}\n{shares}주 @${price:.2f} = ${cash_amount:.2f}  ({pct:+.1f}% 예상)")
+
+    return f"💵 현금 ${cash_amount:.2f} 적립\n📊 현재 매수 추천 없음, 다음 브리핑까지 보유"
+
+
+def save_watch_state(recommendations):
+    """관망 상태 저장 (다음날 재알림용)"""
+    watch_data = {
+        'date': datetime.now(est).strftime('%Y-%m-%d'),
+        'recommendations': recommendations
+    }
+    write_github_file('watch_state.json', watch_data, '👀 관망 상태 저장')
 
 # ============================================================
 # 미니앱 HTML
@@ -601,21 +703,101 @@ def webhook():
     if not data:
         return 'OK'
 
-    # callback_query만 처리
+    bot_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
+    now_str = datetime.now(est).strftime('%H:%M EST')
+
+    # ── 일반 메시지 처리 (텍스트/사진) ──
+    message = data.get('message')
+    if message:
+        chat_id = message.get('chat', {}).get('id')
+        if not chat_id:
+            return 'OK'
+
+        # 사진 처리 (스크린샷 인식)
+        if message.get('photo'):
+            photo = message['photo'][-1]  # 최고 해상도
+            file_id = photo['file_id']
+            try:
+                # 파일 다운로드
+                file_resp = requests.get(f"{bot_url}/getFile", params={'file_id': file_id}).json()
+                file_path = file_resp['result']['file_path']
+                file_url = f"https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/{file_path}"
+                img_data = requests.get(file_url).content
+                img_b64 = base64.b64encode(img_data).decode()
+
+                result = analyze_screenshot(img_b64)
+                if result and result.get('type') != 'unknown':
+                    ticker = result.get('ticker', '?')
+                    action = result.get('action', '?')
+                    shares = result.get('shares', 0)
+                    price = result.get('price', 0)
+                    amount = result.get('amount', 0)
+
+                    if result['type'] == 'dividend':
+                        text = f"💰 배당금 인식:\n{ticker} ${amount:.2f}\n\n맞으면 ✅, 틀리면 ❌"
+                        user_state[str(chat_id)] = {'mode': 'confirm_dividend', 'amount': amount, 'ticker': ticker}
+                    else:
+                        action_kr = '매수' if action == 'buy' else '매도'
+                        text = f"📝 체결 인식:\n{ticker} {action_kr} {shares}주 @${price:.2f}\n\n맞으면 ✅, 틀리면 ❌"
+                        user_state[str(chat_id)] = {
+                            'mode': 'confirm_trade',
+                            'ticker': ticker, 'action': action,
+                            'shares': shares, 'price': price
+                        }
+
+                    keyboard = {'inline_keyboard': [[
+                        {'text': '✅ 맞아', 'callback_data': 'screenshot_confirm'},
+                        {'text': '❌ 다시', 'callback_data': 'screenshot_reject'}
+                    ]]}
+                    send_telegram_msg(chat_id, text, keyboard)
+                else:
+                    send_telegram_msg(chat_id, "⚠️ 인식 실패. 수동으로 입력해주세요.\n예: 55.20")
+            except Exception as e:
+                print(f"⚠️ 사진 처리 오류: {e}")
+                send_telegram_msg(chat_id, "⚠️ 사진 처리 실패. 금액을 직접 입력해주세요.")
+            return 'OK'
+
+        # 텍스트 메시지 처리
+        text = message.get('text', '').strip()
+        state = user_state.get(str(chat_id), {})
+
+        if state.get('mode') == 'waiting_dividend_amount':
+            try:
+                amount = float(text.replace('$', '').replace(',', ''))
+                portfolio = read_github_file('current_portfolio.json')
+                if portfolio:
+                    old_cash = portfolio.get('accumulated_cash', 0)
+                    portfolio['accumulated_cash'] = old_cash + amount
+                    write_github_file('current_portfolio.json', portfolio, '💰 배당금 입금')
+
+                    rec_text = get_investment_recommendation(portfolio['accumulated_cash'])
+                    msg = f"💰 배당금 ${amount:.2f} 입금\n💵 현금: ${portfolio['accumulated_cash']:.2f}\n\n{rec_text}"
+                    keyboard = {'inline_keyboard': [[
+                        {'text': '✅ 매수', 'callback_data': 'div_buy'},
+                        {'text': '💵 현금 보유', 'callback_data': 'div_cash'}
+                    ]]}
+                    user_state[str(chat_id)] = {'mode': 'none', 'cash': portfolio['accumulated_cash']}
+                    send_telegram_msg(chat_id, msg, keyboard)
+                else:
+                    send_telegram_msg(chat_id, "⚠️ 포트폴리오를 읽을 수 없습니다.")
+                    user_state.pop(str(chat_id), None)
+            except ValueError:
+                send_telegram_msg(chat_id, "숫자만 입력해주세요. 예: 55.20")
+            return 'OK'
+
+        return 'OK'
+
+    # ── 콜백 버튼 처리 ──
     callback_query = data.get('callback_query')
     if not callback_query:
         return 'OK'
 
     callback_data = callback_query.get('data', '')
     callback_id = callback_query['id']
-    message = callback_query.get('message', {})
-    chat_id = message.get('chat', {}).get('id')
-    message_id = message.get('message_id')
+    cb_message = callback_query.get('message', {})
+    chat_id = cb_message.get('chat', {}).get('id')
+    message_id = cb_message.get('message_id')
 
-    bot_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
-    now_str = datetime.now(est).strftime('%H:%M EST')
-
-    # answer callback query
     requests.post(f"{bot_url}/answerCallbackQuery", json={'callback_query_id': callback_id})
 
     if callback_data == 'trade_complete':
@@ -631,6 +813,13 @@ def webhook():
         })
 
     elif callback_data == 'trade_watch':
+        # 관망 상태 저장 (재알림용)
+        try:
+            pending = read_github_file('pending_trades.json')
+            if pending:
+                save_watch_state(pending)
+        except:
+            pass
         keyboard = {'inline_keyboard': [[{
             'text': f'👀 관망 중 ({now_str})',
             'callback_data': 'noop'
@@ -650,6 +839,116 @@ def webhook():
             'chat_id': chat_id,
             'message_id': message_id,
             'reply_markup': keyboard
+        })
+
+    elif callback_data == 'dividend_input':
+        user_state[str(chat_id)] = {'mode': 'waiting_dividend_amount'}
+        send_telegram_msg(chat_id, "💰 배당금 금액을 입력하세요.\n예: 55.20\n\n또는 스크린샷을 보내주세요.")
+
+    elif callback_data == 'screenshot_confirm':
+        state = user_state.get(str(chat_id), {})
+        if state.get('mode') == 'confirm_dividend':
+            amount = state.get('amount', 0)
+            portfolio = read_github_file('current_portfolio.json')
+            if portfolio:
+                old_cash = portfolio.get('accumulated_cash', 0)
+                portfolio['accumulated_cash'] = old_cash + amount
+                write_github_file('current_portfolio.json', portfolio, '💰 배당금 입금')
+                rec_text = get_investment_recommendation(portfolio['accumulated_cash'])
+                msg = f"💰 배당금 ${amount:.2f} 입금\n💵 현금: ${portfolio['accumulated_cash']:.2f}\n\n{rec_text}"
+                keyboard = {'inline_keyboard': [[
+                    {'text': '✅ 매수', 'callback_data': 'div_buy'},
+                    {'text': '💵 현금 보유', 'callback_data': 'div_cash'}
+                ]]}
+                send_telegram_msg(chat_id, msg, keyboard)
+
+        elif state.get('mode') == 'confirm_trade':
+            ticker = state.get('ticker', '')
+            action = state.get('action', '')
+            shares = state.get('shares', 0)
+            price = state.get('price', 0)
+            portfolio = read_github_file('current_portfolio.json')
+            if portfolio and ticker:
+                if action == 'buy':
+                    tfsa1 = portfolio.get('tfsa1', {})
+                    if ticker in tfsa1:
+                        old = tfsa1[ticker]
+                        total_shares = old.get('shares', 0) + shares
+                        total_cost = old.get('shares', 0) * old.get('avg_price', 0) + shares * price
+                        tfsa1[ticker] = {
+                            'shares': round(total_shares, 4),
+                            'avg_price': round(total_cost / total_shares, 2) if total_shares > 0 else price
+                        }
+                    else:
+                        tfsa1[ticker] = {'shares': shares, 'avg_price': price}
+                    portfolio['tfsa1'] = tfsa1
+                    # 현금 차감
+                    spent = shares * price
+                    portfolio['accumulated_cash'] = max(0, portfolio.get('accumulated_cash', 0) - spent)
+
+                elif action == 'sell':
+                    tfsa1 = portfolio.get('tfsa1', {})
+                    if ticker in tfsa1:
+                        old_shares = tfsa1[ticker].get('shares', 0)
+                        new_shares = round(old_shares - shares, 4)
+                        if new_shares <= 0:
+                            del tfsa1[ticker]
+                        else:
+                            tfsa1[ticker]['shares'] = new_shares
+                    portfolio['tfsa1'] = tfsa1
+                    # 매도금 현금 추가
+                    portfolio['accumulated_cash'] = portfolio.get('accumulated_cash', 0) + shares * price
+
+                write_github_file('current_portfolio.json', portfolio, '📝 체결 반영')
+                send_telegram_msg(chat_id, f"✅ 포트폴리오 업데이트 완료\n{ticker} {action} {shares}주 @${price:.2f}")
+
+        user_state.pop(str(chat_id), None)
+
+    elif callback_data == 'screenshot_reject':
+        user_state[str(chat_id)] = {'mode': 'waiting_dividend_amount'}
+        send_telegram_msg(chat_id, "금액을 직접 입력해주세요.\n예: 55.20")
+
+    elif callback_data == 'div_buy':
+        # 투자 추천 최고 자산 매수 처리
+        portfolio = read_github_file('current_portfolio.json')
+        pending = read_github_file('pending_trades.json')
+        if portfolio and pending:
+            cash = portfolio.get('accumulated_cash', 0)
+            tfsa1 = pending.get('tfsa1', [])
+            buys = [a for a in tfsa1 if a.get('action') == 'BUY']
+            if buys and cash > 0:
+                best = max(buys, key=lambda x: x.get('score', 0))
+                ticker = best['ticker']
+                price = best['price']
+                shares = round(cash / price, 4) if price > 0 else 0
+
+                # 포트폴리오 업데이트
+                t1 = portfolio.get('tfsa1', {})
+                if ticker in t1:
+                    old = t1[ticker]
+                    total_shares = old.get('shares', 0) + shares
+                    total_cost = old.get('shares', 0) * old.get('avg_price', 0) + shares * price
+                    t1[ticker] = {
+                        'shares': round(total_shares, 4),
+                        'avg_price': round(total_cost / total_shares, 2) if total_shares > 0 else price
+                    }
+                else:
+                    t1[ticker] = {'shares': shares, 'avg_price': price}
+                portfolio['tfsa1'] = t1
+                portfolio['accumulated_cash'] = 0
+                write_github_file('current_portfolio.json', portfolio, '💰 배당금 재투자')
+                send_telegram_msg(chat_id, f"✅ 매수 완료\n{ticker} {shares}주 @${price:.2f}\n💵 현금: $0")
+            else:
+                send_telegram_msg(chat_id, "⚠️ 매수할 수 없습니다.")
+        keyboard = {'inline_keyboard': [[{'text': f'✅ 매수 완료 ({now_str})', 'callback_data': 'noop'}]]}
+        requests.post(f"{bot_url}/editMessageReplyMarkup", json={
+            'chat_id': chat_id, 'message_id': message_id, 'reply_markup': keyboard
+        })
+
+    elif callback_data == 'div_cash':
+        keyboard = {'inline_keyboard': [[{'text': f'💵 현금 보유 ({now_str})', 'callback_data': 'noop'}]]}
+        requests.post(f"{bot_url}/editMessageReplyMarkup", json={
+            'chat_id': chat_id, 'message_id': message_id, 'reply_markup': keyboard
         })
 
     return 'OK'
@@ -682,5 +981,4 @@ if __name__ == '__main__':
 
     port = int(os.environ.get('PORT', 5000))
     flask_app.run(host='0.0.0.0', port=port)
-
 
