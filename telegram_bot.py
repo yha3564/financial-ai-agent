@@ -130,13 +130,34 @@ def send_telegram_msg(chat_id, text, keyboard=None):
     requests.post(f"{bot_url}/sendMessage", json=payload)
 
 
-def get_investment_recommendation(cash_amount):
-    """현금으로 투자 추천 생성 (pending_trades 기반)"""
+def get_investment_recommendation(cash_amount, dividend_ticker=None):
+    """현금으로 투자 추천 생성"""
+    portfolio = read_github_file('current_portfolio.json')
+
+    # TFSA2 배당금 → 본체 자산 추가매수
+    if dividend_ticker and portfolio:
+        tfsa2 = portfolio.get('tfsa2', {})
+        for t, data in tfsa2.items():
+            origin = data.get('origin_ticker', '')
+            # 배당 티커가 본체이거나 현재 보유 중인 TFSA2 자산이면
+            if dividend_ticker == origin or dividend_ticker == t:
+                import yfinance as yf
+                try:
+                    price = float(yf.download(t, period='1d', progress=False)['Close'].iloc[-1])
+                except:
+                    price = data.get('avg_price', 0)
+                if price > 0:
+                    shares = round(cash_amount / price, 4)
+                    return (f"📊 TFSA2 추가매수 추천:\n"
+                            f"{t}\n{shares}주 @${price:.2f} = ${cash_amount:.2f}",
+                            'tfsa2', t, shares, price)
+
+    # TFSA1 추천
     pending = read_github_file('pending_trades.json')
     if not pending:
-        return f"💵 현금 ${cash_amount:.2f} 적립\n📊 다음 브리핑에서 추천이 나옵니다."
+        return (f"💵 현금 ${cash_amount:.2f} 적립\n📊 다음 브리핑에서 추천이 나옵니다.",
+                None, None, 0, 0)
 
-    # TFSA1 매수 후보에서 최고 점수 찾기
     tfsa1 = pending.get('tfsa1', [])
     buys = [a for a in tfsa1 if a.get('action') == 'BUY']
     if buys:
@@ -146,9 +167,11 @@ def get_investment_recommendation(cash_amount):
         shares = round(cash_amount / price, 4) if price > 0 else 0
         pct = best.get('expected_pct', 0)
         return (f"📊 투자 추천:\n"
-                f"{ticker}\n{shares}주 @${price:.2f} = ${cash_amount:.2f}  ({pct:+.1f}% 예상)")
+                f"{ticker}\n{shares}주 @${price:.2f} = ${cash_amount:.2f}  ({pct:+.1f}% 예상)",
+                'tfsa1', ticker, shares, price)
 
-    return f"💵 현금 ${cash_amount:.2f} 적립\n📊 현재 매수 추천 없음, 다음 브리핑까지 보유"
+    return (f"💵 현금 ${cash_amount:.2f} 적립\n📊 현재 매수 추천 없음, 다음 브리핑까지 보유",
+            None, None, 0, 0)
 
 
 def save_watch_state(recommendations):
@@ -669,7 +692,8 @@ def submit_trades():
                     'shares': round(old_shares + buy_shares, 4),
                     'avg_price': round(new_avg, 4),
                     'purpose': purpose_info.get('purpose', data.get('purpose', '')),
-                    'target_amount': purpose_info.get('target_amount', 0)
+                    'target_amount': purpose_info.get('target_amount', 0),
+                    'origin_ticker': holder_ticker if holder_ticker != ticker else ''
                 }
 
         # 시간 업데이트
@@ -770,13 +794,23 @@ def webhook():
                     portfolio['accumulated_cash'] = old_cash + amount
                     write_github_file('current_portfolio.json', portfolio, '💰 배당금 입금')
 
-                    rec_text = get_investment_recommendation(portfolio['accumulated_cash'])
-                    msg = f"💰 배당금 ${amount:.2f} 입금\n💵 현금: ${portfolio['accumulated_cash']:.2f}\n\n{rec_text}"
+                    div_ticker = state.get('dividend_ticker')
+                    div_account = state.get('dividend_account', 'tfsa1')
+                    rec_result = get_investment_recommendation(portfolio['accumulated_cash'], div_ticker)
+                    rec_text, rec_account, rec_ticker, rec_shares, rec_price = rec_result
+
+                    account_label = 'TFSA 2' if div_account == 'tfsa2' else 'TFSA 1'
+                    msg = (f"💰 {account_label} | {div_ticker} 배당금 ${amount:.2f} 입금\n"
+                           f"💵 현금: ${portfolio['accumulated_cash']:.2f}\n\n{rec_text}")
                     keyboard = {'inline_keyboard': [[
                         {'text': '✅ 매수', 'callback_data': 'div_buy'},
                         {'text': '💵 현금 보유', 'callback_data': 'div_cash'}
                     ]]}
-                    user_state[str(chat_id)] = {'mode': 'none', 'cash': portfolio['accumulated_cash']}
+                    user_state[str(chat_id)] = {
+                        'mode': 'none', 'cash': portfolio['accumulated_cash'],
+                        'rec_account': rec_account, 'rec_ticker': rec_ticker,
+                        'rec_shares': rec_shares, 'rec_price': rec_price
+                    }
                     send_telegram_msg(chat_id, msg, keyboard)
                 else:
                     send_telegram_msg(chat_id, "⚠️ 포트폴리오를 읽을 수 없습니다.")
@@ -842,24 +876,64 @@ def webhook():
         })
 
     elif callback_data == 'dividend_input':
-        user_state[str(chat_id)] = {'mode': 'waiting_dividend_amount'}
-        send_telegram_msg(chat_id, "💰 배당금 금액을 입력하세요.\n예: 55.20\n\n또는 스크린샷을 보내주세요.")
+        # Step 1: TFSA 선택
+        keyboard = {'inline_keyboard': [
+            [{'text': '💼 TFSA 1', 'callback_data': 'div_select_tfsa1'},
+             {'text': '💰 TFSA 2', 'callback_data': 'div_select_tfsa2'}]
+        ]}
+        send_telegram_msg(chat_id, "💰 배당금 어느 계좌에서 들어왔나요?", keyboard)
+
+    elif callback_data in ('div_select_tfsa1', 'div_select_tfsa2'):
+        # Step 2: 종목 선택
+        account = 'tfsa1' if callback_data == 'div_select_tfsa1' else 'tfsa2'
+        portfolio = read_github_file('current_portfolio.json')
+        if portfolio:
+            holdings = portfolio.get(account, {})
+            buttons = []
+            for t in holdings:
+                buttons.append([{'text': t, 'callback_data': f'div_ticker_{account}_{t}'}])
+            if buttons:
+                keyboard = {'inline_keyboard': buttons}
+                send_telegram_msg(chat_id, "어떤 종목 배당금인가요?", keyboard)
+            else:
+                send_telegram_msg(chat_id, "⚠️ 해당 계좌에 보유 자산이 없습니다.")
+        else:
+            send_telegram_msg(chat_id, "⚠️ 포트폴리오를 읽을 수 없습니다.")
+
+    elif callback_data.startswith('div_ticker_'):
+        # Step 3: 금액 입력 대기
+        parts = callback_data.split('_', 3)  # div_ticker_tfsa1_XEI.TO
+        account = parts[2]
+        ticker = parts[3]
+        user_state[str(chat_id)] = {
+            'mode': 'waiting_dividend_amount',
+            'dividend_account': account,
+            'dividend_ticker': ticker
+        }
+        send_telegram_msg(chat_id, f"💰 {ticker} 배당금 금액을 입력하세요.\n예: 55.20\n\n또는 스크린샷을 보내주세요.")
 
     elif callback_data == 'screenshot_confirm':
         state = user_state.get(str(chat_id), {})
         if state.get('mode') == 'confirm_dividend':
             amount = state.get('amount', 0)
+            div_ticker = state.get('ticker')
             portfolio = read_github_file('current_portfolio.json')
             if portfolio:
                 old_cash = portfolio.get('accumulated_cash', 0)
                 portfolio['accumulated_cash'] = old_cash + amount
                 write_github_file('current_portfolio.json', portfolio, '💰 배당금 입금')
-                rec_text = get_investment_recommendation(portfolio['accumulated_cash'])
+                rec_result = get_investment_recommendation(portfolio['accumulated_cash'], div_ticker)
+                rec_text, rec_account, rec_ticker, rec_shares, rec_price = rec_result
                 msg = f"💰 배당금 ${amount:.2f} 입금\n💵 현금: ${portfolio['accumulated_cash']:.2f}\n\n{rec_text}"
                 keyboard = {'inline_keyboard': [[
                     {'text': '✅ 매수', 'callback_data': 'div_buy'},
                     {'text': '💵 현금 보유', 'callback_data': 'div_cash'}
                 ]]}
+                user_state[str(chat_id)] = {
+                    'mode': 'none',
+                    'rec_account': rec_account, 'rec_ticker': rec_ticker,
+                    'rec_shares': rec_shares, 'rec_price': rec_price
+                }
                 send_telegram_msg(chat_id, msg, keyboard)
 
         elif state.get('mode') == 'confirm_trade':
@@ -905,41 +979,60 @@ def webhook():
         user_state.pop(str(chat_id), None)
 
     elif callback_data == 'screenshot_reject':
-        user_state[str(chat_id)] = {'mode': 'waiting_dividend_amount'}
+        old_state = user_state.get(str(chat_id), {})
+        user_state[str(chat_id)] = {
+            'mode': 'waiting_dividend_amount',
+            'dividend_account': old_state.get('dividend_account', ''),
+            'dividend_ticker': old_state.get('ticker', '')
+        }
         send_telegram_msg(chat_id, "금액을 직접 입력해주세요.\n예: 55.20")
 
     elif callback_data == 'div_buy':
-        # 투자 추천 최고 자산 매수 처리
-        portfolio = read_github_file('current_portfolio.json')
-        pending = read_github_file('pending_trades.json')
-        if portfolio and pending:
-            cash = portfolio.get('accumulated_cash', 0)
-            tfsa1 = pending.get('tfsa1', [])
-            buys = [a for a in tfsa1 if a.get('action') == 'BUY']
-            if buys and cash > 0:
-                best = max(buys, key=lambda x: x.get('score', 0))
-                ticker = best['ticker']
-                price = best['price']
-                shares = round(cash / price, 4) if price > 0 else 0
+        state = user_state.get(str(chat_id), {})
+        rec_account = state.get('rec_account')
+        rec_ticker = state.get('rec_ticker')
+        rec_shares = state.get('rec_shares', 0)
+        rec_price = state.get('rec_price', 0)
 
-                # 포트폴리오 업데이트
-                t1 = portfolio.get('tfsa1', {})
-                if ticker in t1:
-                    old = t1[ticker]
+        portfolio = read_github_file('current_portfolio.json')
+        if portfolio and rec_ticker and rec_price > 0:
+            cash = portfolio.get('accumulated_cash', 0)
+            shares = round(cash / rec_price, 4) if rec_price > 0 else 0
+
+            if rec_account == 'tfsa2':
+                # TFSA2 추가매수
+                t2 = portfolio.get('tfsa2', {})
+                if rec_ticker in t2:
+                    old = t2[rec_ticker]
                     total_shares = old.get('shares', 0) + shares
-                    total_cost = old.get('shares', 0) * old.get('avg_price', 0) + shares * price
-                    t1[ticker] = {
+                    total_cost = old.get('shares', 0) * old.get('avg_price', 0) + shares * rec_price
+                    t2[rec_ticker]['shares'] = round(total_shares, 4)
+                    t2[rec_ticker]['avg_price'] = round(total_cost / total_shares, 2) if total_shares > 0 else rec_price
+                else:
+                    t2[rec_ticker] = {'shares': shares, 'avg_price': rec_price}
+                portfolio['tfsa2'] = t2
+            else:
+                # TFSA1 매수
+                t1 = portfolio.get('tfsa1', {})
+                if rec_ticker in t1:
+                    old = t1[rec_ticker]
+                    total_shares = old.get('shares', 0) + shares
+                    total_cost = old.get('shares', 0) * old.get('avg_price', 0) + shares * rec_price
+                    t1[rec_ticker] = {
                         'shares': round(total_shares, 4),
-                        'avg_price': round(total_cost / total_shares, 2) if total_shares > 0 else price
+                        'avg_price': round(total_cost / total_shares, 2) if total_shares > 0 else rec_price
                     }
                 else:
-                    t1[ticker] = {'shares': shares, 'avg_price': price}
+                    t1[rec_ticker] = {'shares': shares, 'avg_price': rec_price}
                 portfolio['tfsa1'] = t1
-                portfolio['accumulated_cash'] = 0
-                write_github_file('current_portfolio.json', portfolio, '💰 배당금 재투자')
-                send_telegram_msg(chat_id, f"✅ 매수 완료\n{ticker} {shares}주 @${price:.2f}\n💵 현금: $0")
-            else:
-                send_telegram_msg(chat_id, "⚠️ 매수할 수 없습니다.")
+
+            portfolio['accumulated_cash'] = 0
+            write_github_file('current_portfolio.json', portfolio, '💰 배당금 재투자')
+            account_label = 'TFSA2' if rec_account == 'tfsa2' else 'TFSA1'
+            send_telegram_msg(chat_id, f"✅ {account_label} 매수 완료\n{rec_ticker} {shares}주 @${rec_price:.2f}\n💵 현금: $0")
+        else:
+            send_telegram_msg(chat_id, "⚠️ 매수할 수 없습니다.")
+        user_state.pop(str(chat_id), None)
         keyboard = {'inline_keyboard': [[{'text': f'✅ 매수 완료 ({now_str})', 'callback_data': 'noop'}]]}
         requests.post(f"{bot_url}/editMessageReplyMarkup", json={
             'chat_id': chat_id, 'message_id': message_id, 'reply_markup': keyboard
