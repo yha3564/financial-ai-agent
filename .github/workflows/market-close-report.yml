@@ -2,10 +2,7 @@ name: Market Close Report
 
 on:
   schedule:
-    # 16:00 EST = 21:00 UTC (장 마감)
-    # 월-금만
     - cron: '0 21 * * 1-5'
-  
   workflow_dispatch:
 
 jobs:
@@ -14,19 +11,23 @@ jobs:
     
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN }}
       
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt --break-system-packages
+          pip install --upgrade pip
+          pip install -r requirements.txt
       
       - name: Generate Market Close Report
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: python market_close_report.py
