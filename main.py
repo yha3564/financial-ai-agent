@@ -68,9 +68,7 @@ class PriceCache:
 
             loaded = sum(1 for v in self._price_cache.values() if v > 0)
             print(f"✅ 가격 로드 완료 ({loaded}/{len(tickers)}개 성공)")
-            if loaded == 0:
-                raise RuntimeError(f"가격 다운로드 전부 실패 ({len(tickers)}개) - yfinance 또는 Yahoo 연결 문제")
-            
+
             failed = [t for t in tickers if self._price_cache.get(t, 0) == 0]
             if failed:
                 print(f"⚠️ {len(failed)}개 개별 재시도...")
@@ -128,7 +126,7 @@ class DailyDigest:
                     self.gemini = self.gemini_client
                 else:
                     genai.configure(api_key=self.gemini_api_key)
-                    self.gemini = genai.GenerativeModel('gemini-1.5-flash')
+                    self.gemini = genai.GenerativeModel('gemini-2.0-flash')
                 print("✅ Gemini 초기화 완료")
             except Exception as e:
                 print(f"⚠️ Gemini 초기화 실패 (Groq만 사용): {e}")
@@ -387,25 +385,29 @@ Rules:
 - neutral assets: skip entirely
 - Return ONLY valid JSON, no markdown"""
 
-        try:
-            response = self.groq.chat.completions.create(
-                messages=[{"role": "user", "content": prompt}],
-                model="llama-3.3-70b-versatile",
-                temperature=0.3,
-                max_tokens=2000,
-            )
-            text = response.choices[0].message.content
-            text = text.replace('```json', '').replace('```', '').strip()
-            return json.loads(text)
-        except Exception as e:
-            print(f"   ⚠️ Groq 오류: {e}, Gemini 폴백...")
+        for attempt in range(3):
+            try:
+                response = self.groq.chat.completions.create(
+                    messages=[{"role": "user", "content": prompt}],
+                    model="llama-3.3-70b-versatile",
+                    temperature=0.3,
+                    max_tokens=2000,
+                )
+                text = response.choices[0].message.content
+                text = text.replace('```json', '').replace('```', '').strip()
+                return json.loads(text)
+            except Exception as e:
+                if attempt < 2:
+                    time.sleep(5)
+                    continue
+                print(f"   ⚠️ Groq 3회 실패: {e}, Gemini 폴백...")
 
         if not self.gemini:
             return {}
         try:
             if USE_NEW_GENAI:
                 response = self.gemini.models.generate_content(
-                    model='gemini-1.5-flash', contents=prompt)
+                    model='gemini-2.0-flash', contents=prompt)
                 text = response.text
             else:
                 response = self.gemini.generate_content(prompt)
@@ -501,23 +503,27 @@ Rules:
 
 JSON만 반환. key_bullish/key_bearish의 assets는 영향받는 보유자산 티커 목록."""
 
-        try:
-            response = self.groq.chat.completions.create(
-                messages=[{"role": "user", "content": prompt}],
-                model="llama-3.3-70b-versatile",
-                temperature=0.3,
-                max_tokens=600,
-            )
-            text = response.choices[0].message.content
-            text = text.replace('```json', '').replace('```', '').strip()
-            return json.loads(text)
-        except:
+        for attempt in range(3):
+            try:
+                response = self.groq.chat.completions.create(
+                    messages=[{"role": "user", "content": prompt}],
+                    model="llama-3.3-70b-versatile",
+                    temperature=0.3,
+                    max_tokens=600,
+                )
+                text = response.choices[0].message.content
+                text = text.replace('```json', '').replace('```', '').strip()
+                return json.loads(text)
+            except:
+                if attempt < 2:
+                    time.sleep(5)
+                    continue
             if not self.gemini:
                 return None
             try:
                 if USE_NEW_GENAI:
                     response = self.gemini.models.generate_content(
-                        model='gemini-1.5-flash', contents=prompt)
+                        model='gemini-2.0-flash', contents=prompt)
                     text = response.text
                 else:
                     response = self.gemini.generate_content(prompt)
