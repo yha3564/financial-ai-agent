@@ -68,7 +68,9 @@ class PriceCache:
 
             loaded = sum(1 for v in self._price_cache.values() if v > 0)
             print(f"✅ 가격 로드 완료 ({loaded}/{len(tickers)}개 성공)")
-
+            if loaded == 0:
+                raise RuntimeError(f"가격 다운로드 전부 실패 ({len(tickers)}개) - yfinance 또는 Yahoo 연결 문제")
+            
             failed = [t for t in tickers if self._price_cache.get(t, 0) == 0]
             if failed:
                 print(f"⚠️ {len(failed)}개 개별 재시도...")
