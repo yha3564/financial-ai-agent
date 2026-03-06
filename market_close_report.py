@@ -196,8 +196,7 @@ class MarketCloseReport:
 
         # TFSA 1
         if self.my_holdings_tfsa1:
-            report += "💼 TFSA 1\n"
-            report += f"💵 현금: ${self.accumulated_cash:.0f}\n"
+            report += f"💼 TFSA 1 | 💵 현금: ${self.accumulated_cash:.0f} CAD\n"
             for ticker, holding in self.my_holdings_tfsa1.items():
                 shares = holding.get('shares', 0)
                 avg_price = holding.get('avg_price', 0)
@@ -235,8 +234,7 @@ class MarketCloseReport:
         tfsa2_daily_dollar = 0
 
         if self.my_holdings_tfsa2:
-            report += "💰 TFSA 2\n"
-            report += f"💵 현금: $0\n"
+            report += "💰 TFSA 2 | 💵 현금: $0\n"
 
             for ticker, holding in self.my_holdings_tfsa2.items():
                 shares = holding.get('shares', 0)
