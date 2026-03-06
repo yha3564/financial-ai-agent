@@ -157,6 +157,9 @@ class IntradayMonitor:
                     self._prices[ticker] = 0
 
         print(f"✅ 가격 로드 완료")
+        loaded = sum(1 for v in self._prices.values() if v > 0)
+        if loaded == 0:
+            raise RuntimeError(f"가격 다운로드 전부 실패 ({len(tickers)}개) - yfinance 또는 Yahoo 연결 문제")
 
     def get_price(self, ticker):
         return self._prices.get(ticker, 0)
