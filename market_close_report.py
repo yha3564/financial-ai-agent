@@ -1,736 +1,346 @@
 import os
+import yaml
 import json
-import hmac
-import hashlib
 import asyncio
-import base64
-import requests
-from datetime import datetime
 import pytz
-from flask import Flask, request, jsonify, render_template_string
+import time
+import pandas as pd
+import yfinance as yf
+from datetime import datetime
 from telegram import Bot
 
-# ============================================================
-# Flask 앱 (미니앱 서빙 + 웹훅)
-# ============================================================
-flask_app = Flask(__name__)
 
-TELEGRAM_TOKEN = os.environ['TELEGRAM_BOT_TOKEN']
-TELEGRAM_CHAT_ID = os.environ['TELEGRAM_CHAT_ID']
-GH_TOKEN = os.environ['GH_TOKEN']
-GITHUB_REPO = os.environ.get('GITHUB_REPOSITORY', 'yha3564/financial-ai-agent')
-# Render's built-in env var is RENDER_EXTERNAL_URL; fall back to custom RENDER_URL
-RENDER_URL = (
-    os.environ.get('RENDER_EXTERNAL_URL') or
-    os.environ.get('RENDER_URL') or
-    ''
-).rstrip('/')
+class MarketCloseReport:
+    """장 마감 리포트 v4.0"""
 
-est = pytz.timezone('America/New_York')
+    def __init__(self):
+        print("📊 Market Close Report v4.0 초기화...")
 
-def read_github_file(filename):
-    """GitHub repo에서 JSON 파일 읽기"""
-    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{filename}"
-    headers = {'Authorization': f'token {GH_TOKEN}', 'Accept': 'application/vnd.github.v3.raw'}
-    try:
-        resp = requests.get(url, headers=headers, timeout=10)
-        if resp.status_code == 200:
-            return json.loads(resp.text)
-    except:
-        pass
-    return None
+        self.telegram_token = os.environ['TELEGRAM_BOT_TOKEN']
+        self.telegram_chat_id = os.environ['TELEGRAM_CHAT_ID']
 
-def write_github_file(filename, data, message="Update"):
-    """GitHub repo에 JSON 파일 쓰기"""
-    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{filename}"
-    headers = {'Authorization': f'token {GH_TOKEN}'}
-    
-    # 기존 파일 SHA 가져오기
-    resp = requests.get(url, headers=headers, timeout=10)
-    sha = resp.json().get('sha', '') if resp.status_code == 200 else ''
-    
-    content = base64.b64encode(json.dumps(data, indent=2, ensure_ascii=False).encode()).decode()
-    
-    payload = {'message': message, 'content': content}
-    if sha:
-        payload['sha'] = sha
-    
-    requests.put(url, headers=headers, json=payload, timeout=10)
+        self.est = pytz.timezone('America/New_York')
+        self.now = datetime.now(self.est)
 
-# ============================================================
-# 미니앱 HTML
-# ============================================================
-MINIAPP_HTML = '''<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>체결가 입력</title>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: var(--tg-theme-bg-color, #1c1c1e);
-      color: var(--tg-theme-text-color, #ffffff);
-      padding: 16px;
-      min-height: 100vh;
-    }
-    h2 {
-      font-size: 18px;
-      font-weight: 700;
-      margin-bottom: 4px;
-    }
-    .subtitle {
-      font-size: 13px;
-      color: var(--tg-theme-hint-color, #8e8e93);
-      margin-bottom: 20px;
-    }
-    .section {
-      margin-bottom: 24px;
-    }
-    .section-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--tg-theme-hint-color, #8e8e93);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 8px;
-      padding-bottom: 4px;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
-    }
-    .trade-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 0;
-      border-bottom: 1px solid rgba(255,255,255,0.05);
-    }
-    .trade-row:last-child { border-bottom: none; }
-    .trade-info { flex: 1; }
-    .trade-ticker {
-      font-size: 15px;
-      font-weight: 600;
-    }
-    .trade-detail {
-      font-size: 12px;
-      color: var(--tg-theme-hint-color, #8e8e93);
-      margin-top: 2px;
-    }
-    .trade-badge {
-      font-size: 11px;
-      font-weight: 600;
-      padding: 3px 8px;
-      border-radius: 10px;
-      margin-right: 10px;
-    }
-    .badge-buy { background: rgba(52,199,89,0.2); color: #34c759; }
-    .badge-sell-auto {
-      background: rgba(142,142,147,0.2);
-      color: #8e8e93;
-      font-size: 10px;
-    }
-    .price-input {
-      width: 110px;
-      padding: 8px 10px;
-      background: var(--tg-theme-secondary-bg-color, #2c2c2e);
-      border: 1px solid rgba(255,255,255,0.15);
-      border-radius: 8px;
-      color: var(--tg-theme-text-color, #ffffff);
-      font-size: 15px;
-      text-align: right;
-    }
-    .price-input:focus {
-      outline: none;
-      border-color: #0a84ff;
-    }
-    .price-input::placeholder { color: #8e8e93; }
-    .auto-label {
-      font-size: 12px;
-      color: #8e8e93;
-      font-style: italic;
-      width: 110px;
-      text-align: right;
-    }
-    .submit-btn {
-      width: 100%;
-      padding: 14px;
-      background: #0a84ff;
-      color: white;
-      border: none;
-      border-radius: 12px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      margin-top: 8px;
-    }
-    .submit-btn:active { opacity: 0.8; }
-    .submit-btn:disabled { background: #8e8e93; cursor: not-allowed; }
-    .error-msg {
-      color: #ff453a;
-      font-size: 13px;
-      margin-top: 8px;
-      display: none;
-    }
-    .success-msg {
-      text-align: center;
-      padding: 40px 20px;
-      display: none;
-    }
-    .success-icon { font-size: 48px; margin-bottom: 12px; }
-    .success-text { font-size: 18px; font-weight: 600; }
-  </style>
-</head>
-<body>
-  <div id="main-content">
-    <h2>✅ 체결가 입력</h2>
-    <p class="subtitle" id="timestamp"></p>
-    <div id="trades-container"></div>
-    <p class="error-msg" id="error-msg">모든 매도/매수 가격과 주수를 입력해주세요.</p>
-    <button class="submit-btn" id="submit-btn" onclick="submitTrades()">기록 완료</button>
-  </div>
+        with open('portfolio.yaml', 'r', encoding='utf-8') as f:
+            self.config = yaml.safe_load(f)
 
-  <div class="success-msg" id="success-msg">
-    <div class="success-icon">✅</div>
-    <div class="success-text">기록 완료!</div>
-    <p style="margin-top:8px;color:#8e8e93;font-size:14px">포트폴리오가 업데이트됐어요</p>
-  </div>
+        self.load_portfolio()
+        self.build_ticker_name_map()
 
-  <script>
-    const tg = window.Telegram.WebApp;
-    tg.ready();
-    tg.expand();
+        sold_tickers = [s['ticker'] for s in self.today_sells]
+        all_tickers = list(set(
+            list(self.my_holdings_tfsa1.keys()) +
+            list(self.my_holdings_tfsa2.keys()) +
+            sold_tickers
+        ))
+        self._load_prices(all_tickers)
 
-    let pendingTrades = null;
+        print(f"✅ 초기화 완료 - {self.now.strftime('%Y-%m-%d %H:%M %Z')}")
 
-    // pending_trades 로드
-    async function loadTrades() {
-      try {
-        const res = await fetch('/api/pending_trades');
-        pendingTrades = await res.json();
-        renderTrades(pendingTrades);
+    def load_portfolio(self):
+        try:
+            with open('current_portfolio.json', 'r', encoding='utf-8') as f:
+                portfolio = json.load(f)
+            self.my_holdings_tfsa1 = portfolio.get('tfsa1', {})
+            self.my_holdings_tfsa2 = portfolio.get('tfsa2', {})
+            self.accumulated_cash = portfolio.get('accumulated_cash', 0)
+            print(f"📂 포트폴리오 로드 완료")
+        except FileNotFoundError:
+            print("❌ 포트폴리오 파일 없음")
+            self.my_holdings_tfsa1 = {}
+            self.my_holdings_tfsa2 = {}
+            self.accumulated_cash = 0
 
-        const ts = new Date(pendingTrades.timestamp);
-        document.getElementById('timestamp').textContent =
-          ts.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'}) + ' 추천';
-      } catch(e) {
-        document.getElementById('trades-container').innerHTML =
-          '<p style="color:#ff453a">거래 정보를 불러올 수 없어요</p>';
-      }
-    }
+        for asset in self.config.get('tfsa2_assets', []):
+            ticker = asset['ticker']
+            if ticker in self.my_holdings_tfsa2:
+                self.my_holdings_tfsa2[ticker]['purpose'] = asset.get('purpose', '')
+                self.my_holdings_tfsa2[ticker]['target_amount'] = asset.get('target_amount', 0)
 
-    // IMP-002: 추천가 힌트 표시용 헬퍼
-    function recHint(recPrice) {
-      if (!recPrice || recPrice <= 0) return '';
-      return `<div style="font-size:11px;color:#8e8e93;margin-top:3px">추천가 $${parseFloat(recPrice).toFixed(2)}</div>`;
-    }
+        self.today_sells = []
+        try:
+            with open('today_sold.json', 'r', encoding='utf-8') as f:
+                sold_data = json.load(f)
+            if sold_data.get('date') == self.now.strftime('%Y-%m-%d'):
+                self.today_sells = sold_data.get('sells', [])
+            print(f"📋 오늘 매도 기록: {len(self.today_sells)}건")
+        except FileNotFoundError:
+            print("📋 오늘 매도 기록 없음")
 
-    function renderTrades(data) {
-      const container = document.getElementById('trades-container');
-      let html = '';
+    def build_ticker_name_map(self):
+        self.ticker_names = {}
+        for section in ['tfsa1_assets', 'tfsa2_assets', 'alternative_assets', 'safe_assets']:
+            for asset in self.config.get(section, []):
+                self.ticker_names[asset['ticker']] = asset.get('name', asset['ticker'])
 
-      // TFSA 1
-      const tfsa1_buys = (data.tfsa1 || []).filter(a => a.action === 'BUY');
-      const tfsa1_sells = (data.tfsa1 || []).filter(a => a.action === 'SELL');
+    def _load_prices(self, tickers):
+        if not tickers:
+            self._prices = {}
+            self._hist = {}
+            return
 
-      if (tfsa1_buys.length > 0 || tfsa1_sells.length > 0) {
-        html += '<div class="section">';
-        html += '<div class="section-title">TFSA 1</div>';
+        print(f"📥 가격 로드 ({len(tickers)}개)...")
+        self._prices = {}
+        self._hist = {}
 
-        // 매도 — IMP-001/008: 체결가 직접 입력, IMP-002: 추천가 pre-fill + 힌트
-        tfsa1_sells.forEach(s => {
-          const typeLabel = s.type === 'full' ? '전량매도' : s.type === 'half' ? '절반매도' : '부분매도';
-          const recPrice = s.recommended_price || '';
-          const recVal = recPrice ? parseFloat(recPrice).toFixed(2) : '';
-          html += `<div class="trade-row">
-            <div class="trade-info">
-              <div class="trade-ticker">${s.ticker}</div>
-              <div class="trade-detail">${s.shares}주 ${typeLabel}</div>
-              ${recHint(recPrice)}
-            </div>
-            <span class="trade-badge badge-sell-auto">${typeLabel}</span>
-            <input class="price-input" type="number" step="0.01"
-              id="sell_price_tfsa1_${s.ticker}"
-              data-recommended="${recVal}"
-              placeholder="${recVal ? '$' + recVal : '$0.00'}"
-              value="${recVal}"
-              inputmode="decimal">
-          </div>`;
-        });
+        try:
+            tickers_str = " ".join(tickers)
+            df = yf.download(tickers_str, period="5d", auto_adjust=True,
+                           progress=False, threads=False)
 
-        // 매수 — IMP-002: 추천가 pre-fill + 힌트
-        tfsa1_buys.forEach(b => {
-          const recPrice = b.recommended_price || '';
-          const recVal = recPrice ? parseFloat(recPrice).toFixed(2) : '';
-          html += `<div class="trade-row">
-            <div class="trade-info">
-              <div class="trade-ticker">${b.ticker}</div>
-              <div class="trade-detail">매수</div>
-              ${recHint(recPrice)}
-            </div>
-            <span class="trade-badge badge-buy">매수</span>
-            <input class="price-input" type="number" step="0.0001"
-              id="shares_tfsa1_${b.ticker}"
-              placeholder="주수"
-              value="${b.shares || ''}"
-              inputmode="decimal"
-              style="width:80px;margin-right:4px">
-            <input class="price-input" type="number" step="0.01"
-              id="price_tfsa1_${b.ticker}"
-              data-recommended="${recVal}"
-              placeholder="${recVal ? '$' + recVal : '$0.00'}"
-              value="${recVal}"
-              inputmode="decimal">
-          </div>`;
-        });
+            if df.empty:
+                raise ValueError("빈 데이터")
 
-        html += '</div>';
-      }
-
-      // TFSA 2
-      const tfsa2 = data.tfsa2 || {};
-      Object.entries(tfsa2).forEach(([ticker, tdata]) => {
-        const purpose = tdata.purpose || '';
-        const label = purpose.includes('girlfriend') ? '여자친구 자금' :
-                      purpose.includes('mother') ? '어머님 자금' : ticker;
-        const sells = (tdata.actions || []).filter(a => a.action === 'SELL');
-        const buys = (tdata.actions || []).filter(a => a.action === 'BUY');
-
-        if (sells.length === 0 && buys.length === 0) return;
-
-        html += `<div class="section">`;
-        html += `<div class="section-title">TFSA 2 | ${label}</div>`;
-
-        sells.forEach(s => {
-          const recPrice = s.recommended_price || '';
-          const recVal = recPrice ? parseFloat(recPrice).toFixed(2) : '';
-          html += `<div class="trade-row">
-            <div class="trade-info">
-              <div class="trade-ticker">${s.ticker}</div>
-              <div class="trade-detail">${s.shares}주 전량매도</div>
-              ${recHint(recPrice)}
-            </div>
-            <span class="trade-badge badge-sell-auto">전량매도</span>
-            <input class="price-input" type="number" step="0.01"
-              id="sell_price_tfsa2_${ticker}_${s.ticker}"
-              data-recommended="${recVal}"
-              placeholder="${recVal ? '$' + recVal : '$0.00'}"
-              value="${recVal}"
-              inputmode="decimal">
-          </div>`;
-        });
-
-        buys.forEach(b => {
-          const recPrice = b.recommended_price || '';
-          const recVal = recPrice ? parseFloat(recPrice).toFixed(2) : '';
-          html += `<div class="trade-row">
-            <div class="trade-info">
-              <div class="trade-ticker">${b.ticker}</div>
-              <div class="trade-detail">매수</div>
-              ${recHint(recPrice)}
-            </div>
-            <span class="trade-badge badge-buy">매수</span>
-            <input class="price-input" type="number" step="0.0001"
-              id="shares_tfsa2_${ticker}_${b.ticker}"
-              placeholder="주수"
-              value="${b.shares || ''}"
-              inputmode="decimal"
-              style="width:80px;margin-right:4px">
-            <input class="price-input" type="number" step="0.01"
-              id="price_tfsa2_${ticker}_${b.ticker}"
-              data-recommended="${recVal}"
-              placeholder="${recVal ? '$' + recVal : '$0.00'}"
-              value="${recVal}"
-              inputmode="decimal">
-          </div>`;
-        });
-
-        html += '</div>';
-      });
-
-      container.innerHTML = html || '<p style="color:#8e8e93">입력할 거래가 없어요</p>';
-    }
-
-    // IMP-004: ±20% 초과 체크 헬퍼
-    function checkSlippage(inputEl) {
-      const recPrice = parseFloat(inputEl.dataset.recommended);
-      const fillPrice = parseFloat(inputEl.value);
-      if (!recPrice || !fillPrice || fillPrice <= 0) return true;
-      const deviation = Math.abs(fillPrice - recPrice) / recPrice;
-      if (deviation > 0.20) {
-        const pct = (deviation * 100).toFixed(1);
-        return confirm(`⚠️ 체결가 $${fillPrice.toFixed(2)}가 추천가 $${recPrice.toFixed(2)}에서 ${pct}% 벗어납니다.
-계속 진행하시겠습니까?`);
-      }
-      return true;
-    }
-
-    async function submitTrades() {
-      if (!pendingTrades) return;
-
-      const prices = {};
-      const shares = {};
-      let allFilled = true;
-
-      // TFSA1 매도 체결가 + IMP-004 슬리피지 경고
-      const tfsa1_sells = (pendingTrades.tfsa1 || []).filter(a => a.action === 'SELL');
-      for (const s of tfsa1_sells) {
-        const el = document.getElementById(`sell_price_tfsa1_${s.ticker}`);
-        const val = el?.value;
-        if (!val || parseFloat(val) <= 0) { allFilled = false; continue; }
-        if (!checkSlippage(el)) return;  // IMP-004: 경고 후 취소
-        prices[`sell_tfsa1_${s.ticker}`] = parseFloat(val);
-      }
-
-      // TFSA1 매수 주수+가격 + IMP-004 슬리피지 경고
-      const tfsa1_buys = (pendingTrades.tfsa1 || []).filter(a => a.action === 'BUY');
-      for (const b of tfsa1_buys) {
-        const priceEl = document.getElementById(`price_tfsa1_${b.ticker}`);
-        const sharesEl = document.getElementById(`shares_tfsa1_${b.ticker}`);
-        const priceVal = priceEl?.value;
-        const sharesVal = sharesEl?.value;
-        if (!priceVal || parseFloat(priceVal) <= 0) { allFilled = false; continue; }
-        if (!sharesVal || parseFloat(sharesVal) <= 0) { allFilled = false; continue; }
-        if (!checkSlippage(priceEl)) return;  // IMP-004
-        prices[`tfsa1_${b.ticker}`] = parseFloat(priceVal);
-        shares[`tfsa1_${b.ticker}`] = parseFloat(sharesVal);
-      }
-
-      const tfsa2 = pendingTrades.tfsa2 || {};
-      for (const [ticker, tdata] of Object.entries(tfsa2)) {
-        // TFSA2 매도
-        const sells = (tdata.actions || []).filter(a => a.action === 'SELL');
-        for (const s of sells) {
-          const el = document.getElementById(`sell_price_tfsa2_${ticker}_${s.ticker}`);
-          const val = el?.value;
-          if (!val || parseFloat(val) <= 0) { allFilled = false; continue; }
-          if (!checkSlippage(el)) return;
-          prices[`sell_tfsa2_${ticker}_${s.ticker}`] = parseFloat(val);
-        }
-        // TFSA2 매수
-        const buys = (tdata.actions || []).filter(a => a.action === 'BUY');
-        for (const b of buys) {
-          const priceEl = document.getElementById(`price_tfsa2_${ticker}_${b.ticker}`);
-          const sharesEl = document.getElementById(`shares_tfsa2_${ticker}_${b.ticker}`);
-          const priceVal = priceEl?.value;
-          const sharesVal = sharesEl?.value;
-          if (!priceVal || parseFloat(priceVal) <= 0) { allFilled = false; continue; }
-          if (!sharesVal || parseFloat(sharesVal) <= 0) { allFilled = false; continue; }
-          if (!checkSlippage(priceEl)) return;
-          prices[`tfsa2_${ticker}_${b.ticker}`] = parseFloat(priceVal);
-          shares[`tfsa2_${ticker}_${b.ticker}`] = parseFloat(sharesVal);
-        }
-      }
-
-      if (!allFilled) {
-        document.getElementById('error-msg').style.display = 'block';
-        return;
-      }
-
-      document.getElementById('error-msg').style.display = 'none';
-      document.getElementById('submit-btn').disabled = true;
-      document.getElementById('submit-btn').textContent = '저장 중...';
-
-      try {
-        const res = await fetch('/api/submit_trades', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ trades: pendingTrades, prices, shares })
-        });
-        const result = await res.json();
-
-        if (result.success) {
-          document.getElementById('main-content').style.display = 'none';
-          document.getElementById('success-msg').style.display = 'block';
-          setTimeout(() => tg.close(), 2000);
-        } else {
-          document.getElementById('submit-btn').disabled = false;
-          document.getElementById('submit-btn').textContent = '기록 완료';
-          alert('저장 실패: ' + result.error);
-        }
-      } catch(e) {
-        document.getElementById('submit-btn').disabled = false;
-        document.getElementById('submit-btn').textContent = '기록 완료';
-        alert('오류가 발생했어요');
-      }
-    }
-
-    loadTrades();
-  </script>
-</body>
-</html>'''
-
-
-# ============================================================
-# Flask 라우트
-# ============================================================
-
-@flask_app.route('/')
-def index():
-    return 'Financial AI Agent Bot Running ✅'
-
-
-@flask_app.route('/miniapp')
-def miniapp():
-    return render_template_string(MINIAPP_HTML)
-
-
-@flask_app.route('/api/pending_trades')
-def get_pending_trades():
-    data = read_github_file('pending_trades.json')
-    if data:
-        return jsonify(data)
-    return jsonify({}), 404
-
-
-@flask_app.route('/api/submit_trades', methods=['POST'])
-def submit_trades():
-    try:
-        data = request.get_json()
-        trades = data.get('trades', {})
-        prices = data.get('prices', {})
-        actual_shares = data.get('shares', {})
-
-        # 포트폴리오 로드
-        portfolio = read_github_file('current_portfolio.json')
-        if not portfolio:
-            return jsonify({'success': False, 'error': 'portfolio not found'}), 404
-
-        now = datetime.now(est)
-
-        # ── TFSA 1 처리 ──
-        tfsa1_actions = trades.get('tfsa1', [])
-        sells = [a for a in tfsa1_actions if a['action'] == 'SELL']
-        buys = [a for a in tfsa1_actions if a['action'] == 'BUY']
-
-        # 매도 처리 (체결가 기준)
-        sell_total = 0
-        sold_history = []
-        for sell in sells:
-            ticker = sell['ticker']
-            sell_price = prices.get(f'sell_tfsa1_{ticker}', 0)
-            sell_shares = sell['shares']
-            sell_total += sell_price * sell_shares
-
-            existing = portfolio.get('tfsa1', {}).get(ticker, {})
-            old_shares = existing.get('shares', 0)
-            avg_price = existing.get('avg_price', 0)
-            remaining = round(old_shares - sell_shares, 4)
-
-            # 실현 손익 기록
-            sold_history.append({
-                'ticker': ticker,
-                'shares': sell_shares,
-                'avg_price': avg_price,
-                'sell_price': sell_price,
-                'sell_value': round(sell_price * sell_shares, 2),
-                'profit': round((sell_price - avg_price) * sell_shares, 2),
-                'profit_pct': round((sell_price - avg_price) / avg_price * 100, 2) if avg_price > 0 else 0,
-                'type': sell.get('type', 'full'),
-                'account': 'TFSA1'
-            })
-
-            if remaining <= 0 or sell['type'] == 'full':
-                if ticker in portfolio.get('tfsa1', {}):
-                    del portfolio['tfsa1'][ticker]
+            if isinstance(df.columns, pd.MultiIndex):
+                for ticker in tickers:
+                    try:
+                        close = df['Close'][ticker].dropna()
+                        if len(close) > 0:
+                            self._prices[ticker] = float(close.iloc[-1])
+                            self._hist[ticker] = pd.DataFrame({'Close': close})
+                        else:
+                            self._prices[ticker] = 0
+                    except:
+                        self._prices[ticker] = 0
             else:
-                portfolio['tfsa1'][ticker]['shares'] = remaining
+                ticker = tickers[0]
+                close = df['Close'].dropna()
+                if len(close) > 0:
+                    self._prices[ticker] = float(close.iloc[-1])
+                    self._hist[ticker] = pd.DataFrame({'Close': close})
 
-        # 매수 처리 (실제 입력 주수+가격 기준)
-        buy_total = 0
-        for buy in buys:
-            ticker = buy['ticker']
-            buy_price = prices.get(f'tfsa1_{ticker}', 0)
-            buy_shares = actual_shares.get(f'tfsa1_{ticker}', buy['shares'])
-            if buy_price <= 0:
-                continue
+        except Exception as e:
+            print(f"⚠️ 배치 로드 오류: {e} - 개별 재시도...")
+            for ticker in tickers:
+                try:
+                    df = yf.download(ticker, period="5d", auto_adjust=True,
+                                   progress=False, threads=False)
+                    if not df.empty and 'Close' in df.columns:
+                        close = df['Close'].dropna()
+                        if len(close) > 0:
+                            self._prices[ticker] = float(close.iloc[-1])
+                            self._hist[ticker] = pd.DataFrame({'Close': close})
+                            continue
+                except:
+                    pass
+                self._prices[ticker] = 0
 
-            buy_total += buy_price * buy_shares
-            existing = portfolio['tfsa1'].get(ticker, {})
-            old_shares = existing.get('shares', 0)
-            old_avg = existing.get('avg_price', 0)
+    def get_price(self, ticker):
+        return self._prices.get(ticker, 0)
 
-            if old_shares > 0 and old_avg > 0:
-                new_avg = (old_shares * old_avg + buy_shares * buy_price) / (old_shares + buy_shares)
-            else:
-                new_avg = buy_price
+    def get_daily_return(self, ticker):
+        hist = self._hist.get(ticker)
+        if hist is None or len(hist) < 2:
+            return 0
+        try:
+            close = hist['Close'].dropna()
+            today = float(close.iloc[-1])
+            yesterday = float(close.iloc[-2])
+            return (today - yesterday) / yesterday * 100
+        except:
+            return 0
 
-            portfolio['tfsa1'][ticker] = {
-                'shares': round(old_shares + buy_shares, 4),
-                'avg_price': round(new_avg, 4)
-            }
+    def generate_report(self):
+        report = f"📊 장마감 브리핑\n🕐 {self.now.strftime('%Y-%m-%d %H:%M EST')}\n"
+        report += "=" * 37 + "\n"
 
-        # accumulated_cash: 기존현금 + 매도금 - 매수금
-        portfolio['accumulated_cash'] = max(0, portfolio.get('accumulated_cash', 0) + sell_total - buy_total)
+        tfsa1_total = 0
+        tfsa1_daily_dollar = 0
 
-        # ── TFSA 2 처리 ──
-        tfsa2_actions = trades.get('tfsa2', {})
-        for holder_ticker, data in tfsa2_actions.items():
-            actions = data.get('actions', [])
-            sell_actions = [a for a in actions if a['action'] == 'SELL']
-            buy_actions = [a for a in actions if a['action'] == 'BUY']
-            purpose_info = {}
+        # 오늘 매도 실현손익
+        if self.today_sells:
+            report += "📤 오늘 매도 실현손익\n"
+            report += "=" * 37 + "\n"
+            total_realized = 0
 
-            for sell in sell_actions:
-                ticker = sell['ticker']
-                existing = portfolio.get('tfsa2', {}).get(ticker, {})
-                avg_price = existing.get('avg_price', 0)
-                sell_price = prices.get(f'sell_tfsa2_{holder_ticker}_{ticker}', 0)
-                sell_shares = sell['shares']
+            has_slippage = any(s.get('recommended_price') for s in self.today_sells)
+            total_slippage = 0
 
-                sold_history.append({
-                    'ticker': ticker,
-                    'shares': sell_shares,
-                    'avg_price': avg_price,
-                    'sell_price': sell_price,
-                    'sell_value': round(sell_price * sell_shares, 2),
-                    'profit': round((sell_price - avg_price) * sell_shares, 2),
-                    'profit_pct': round((sell_price - avg_price) / avg_price * 100, 2) if avg_price > 0 else 0,
-                    'type': sell.get('type', 'full'),
-                    'account': 'TFSA2'
-                })
+            for s in self.today_sells:
+                ticker = s['ticker']
+                name = self.ticker_names.get(ticker, ticker)
+                shares = s['shares']
+                avg_price = s['avg_price']
+                sell_price = s['sell_price']
+                sell_value = s['sell_value']
+                profit = s['profit']
+                profit_pct = s['profit_pct']
+                type_label = "전량" if s['type'] == 'full' else "절반" if s['type'] == 'half' else "부분"
+                profit_emoji = "🟢" if profit >= 0 else "🔴"
+                total_realized += profit
 
-                if ticker in portfolio.get('tfsa2', {}):
-                    purpose_info = {
-                        k: v for k, v in portfolio['tfsa2'][ticker].items()
-                        if k in ['purpose', 'target_amount']
-                    }
-                    del portfolio['tfsa2'][ticker]
+                report += f"{ticker} ({name}) {type_label}매도\n"
+                report += f"{shares}주 @${sell_price:.2f} = ${sell_value:.2f}\n"
+                report += f"평균단가 ${avg_price:.2f} → 매도가 ${sell_price:.2f}\n"
+                report += f"실현손익: {profit:+.2f}$ ({profit_pct:+.2f}%) {profit_emoji}\n"
 
-            for buy in buy_actions:
-                ticker = buy['ticker']
-                buy_price = prices.get(f'tfsa2_{holder_ticker}_{ticker}', 0)
-                buy_shares = actual_shares.get(f'tfsa2_{holder_ticker}_{ticker}', buy['shares'])
-                if buy_price <= 0:
+                recommended_price = s.get('recommended_price')
+                if recommended_price and recommended_price > 0:
+                    slippage = sell_price - recommended_price
+                    slippage_dollar = slippage * shares
+                    total_slippage += slippage_dollar
+                    slip_emoji = "🟢" if slippage >= 0 else "🔴"
+                    report += f"슬리피지: 추천가 ${recommended_price:.2f} → 체결가 ${sell_price:.2f} ({slippage:+.2f}$/주 × {shares}주 = {slippage_dollar:+.2f}$) {slip_emoji}\n"
+
+                report += "\n"
+
+            total_emoji = "🟢" if total_realized >= 0 else "🔴"
+            report += f"실현손익 합계: {total_realized:+.2f}$ {total_emoji}\n"
+
+            if has_slippage:
+                slip_emoji = "🟢" if total_slippage >= 0 else "🔴"
+                report += f"슬리피지 합계: {total_slippage:+.2f}$ {slip_emoji}\n"
+
+            report += "=" * 37 + "\n"
+
+        # TFSA 1
+        if self.my_holdings_tfsa1:
+            report += "💼 TFSA 1\n"
+            report += f"💵 현금: ${self.accumulated_cash:.0f}\n"
+            for ticker, holding in self.my_holdings_tfsa1.items():
+                shares = holding.get('shares', 0)
+                avg_price = holding.get('avg_price', 0)
+                price = self.get_price(ticker)
+                daily_pct = self.get_daily_return(ticker)
+
+                if price <= 0:
                     continue
 
-                existing = portfolio['tfsa2'].get(ticker, {})
-                old_shares = existing.get('shares', 0)
-                old_avg = existing.get('avg_price', 0)
+                value = shares * price
+                profit_pct = (price - avg_price) / avg_price * 100 if avg_price > 0 else 0
+                daily_dollar = value * daily_pct / 100
 
-                if old_shares > 0 and old_avg > 0:
-                    new_avg = (old_shares * old_avg + buy_shares * buy_price) / (old_shares + buy_shares)
-                else:
-                    new_avg = buy_price
+                tfsa1_total += value
+                tfsa1_daily_dollar += daily_dollar
 
-                portfolio['tfsa2'][ticker] = {
-                    'shares': round(old_shares + buy_shares, 4),
-                    'avg_price': round(new_avg, 4),
-                    'purpose': purpose_info.get('purpose', data.get('purpose', '')),
-                    'target_amount': purpose_info.get('target_amount', 0)
-                }
+                daily_emoji = "🟢" if daily_pct >= 0 else "🔴"
+                profit_emoji = "🟢" if profit_pct >= 0 else "🔴"
 
-        # 시간 업데이트
-        portfolio['date'] = now.strftime('%Y-%m-%d')
-        portfolio['time'] = now.strftime('%H:%M')
+                name = self.ticker_names.get(ticker, ticker)
 
-        # GitHub에 저장
-        write_github_file('current_portfolio.json', portfolio, '💼 포트폴리오 업데이트')
+                report += f"{ticker} ({name})\n"
+                report += f"{shares}주 × ${price:.2f} = ${value:.2f}\n"
+                report += f"오늘: {daily_pct:+.2f}% ({daily_dollar:+.2f}$) {daily_emoji}\n"
+                report += f"수익: {profit_pct:+.2f}% {profit_emoji}\n\n"
 
-        # 오늘 매도 실현손익 저장
-        if sold_history:
-            existing_sold = read_github_file('today_sold.json') or {}
-            if existing_sold.get('date') != now.strftime('%Y-%m-%d'):
-                existing_sold = {'date': now.strftime('%Y-%m-%d'), 'sells': []}
-            existing_sold['sells'].extend(sold_history)
-            write_github_file('today_sold.json', existing_sold, '📈 매도 기록 업데이트')
+            tfsa1_daily_pct = tfsa1_daily_dollar / tfsa1_total * 100 if tfsa1_total > 0 else 0
+            daily_emoji = "🟢" if tfsa1_daily_dollar >= 0 else "🔴"
 
-        return jsonify({'success': True, 'pushed': True})
+            report += f"소계: ${tfsa1_total:.2f}  오늘 {tfsa1_daily_pct:+.2f}% {daily_emoji}\n"
+            report += "=" * 37 + "\n"
 
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        # TFSA 2
+        tfsa2_total = 0
+        tfsa2_daily_dollar = 0
+
+        if self.my_holdings_tfsa2:
+            report += "💰 TFSA 2\n"
+            report += f"💵 현금: $0\n"
+
+            for ticker, holding in self.my_holdings_tfsa2.items():
+                shares = holding.get('shares', 0)
+                avg_price = holding.get('avg_price', 0)
+                purpose = holding.get('purpose', '')
+                target = holding.get('target_amount', 0)
+                price = self.get_price(ticker)
+                daily_pct = self.get_daily_return(ticker)
+
+                if price <= 0:
+                    continue
+
+                value = shares * price
+                profit_pct = (price - avg_price) / avg_price * 100 if avg_price > 0 else 0
+                daily_dollar = value * daily_pct / 100
+
+                tfsa2_total += value
+                tfsa2_daily_dollar += daily_dollar
+
+                name = self.ticker_names.get(ticker, ticker)
+                purpose_label = "여자친구 자금" if "girlfriend" in purpose else "어머님 자금" if "mother" in purpose else ""
+
+                daily_emoji = "🟢" if daily_pct >= 0 else "🔴"
+                profit_emoji = "🟢" if profit_pct >= 0 else "🔴"
+
+                report += f"{ticker} ({name}) | {purpose_label}\n"
+                report += f"{shares}주 × ${price:.2f} = ${value:.2f}\n"
+                report += f"오늘: {daily_pct:+.2f}% ({daily_dollar:+.2f}$) {daily_emoji}\n"
+                report += f"수익: {profit_pct:+.2f}% {profit_emoji}\n"
+
+                if target > 0:
+                    progress = value / target * 100
+                    report += f"목표: ${value:.0f} / ${target:.0f} ({progress:.1f}%)\n"
+                report += "\n"
+
+            tfsa2_daily_pct = tfsa2_daily_dollar / tfsa2_total * 100 if tfsa2_total > 0 else 0
+            daily_emoji = "🟢" if tfsa2_daily_dollar >= 0 else "🔴"
+            report += f"소계: ${tfsa2_total:.2f}  오늘 {tfsa2_daily_pct:+.2f}% {daily_emoji}\n"
+            report += "=" * 37 + "\n"
+
+        # 전체 요약
+        grand_total = tfsa1_total + tfsa2_total
+        total_daily = tfsa1_daily_dollar + tfsa2_daily_dollar
+        total_daily_pct = total_daily / grand_total * 100 if grand_total > 0 else 0
+        daily_emoji = "🟢" if total_daily >= 0 else "🔴"
+
+        report += f"📈 전체 요약\n"
+        report += f"총 자산: ${grand_total:.2f}\n"
+        report += f"오늘 수익: {total_daily:+.2f}$ ({total_daily_pct:+.2f}%) {daily_emoji}\n"
+        report += "📌 장후 뉴스 수집 시작\n"
+
+        return report
+
+    async def send_telegram(self, message):
+        bot = Bot(token=self.telegram_token)
+        try:
+            await bot.send_message(
+                chat_id=int(self.telegram_chat_id),
+                text=message[:4000]
+            )
+            print("✅ 텔레그램 전송 완료")
+        except Exception as e:
+            print(f"❌ 텔레그램 오류: {e}")
+
+    def run(self):
+        try:
+            print("\n" + "=" * 50)
+            print("📊 장 마감 리포트 생성")
+            print("=" * 50)
+
+            report = self.generate_report()
+            asyncio.run(self.send_telegram(report))
+            print("\n✅ 완료!")
+
+        except Exception as e:
+            error_msg = f"⚠️ Market Close Report 오류\n🕐 {self.now.strftime('%H:%M EST')}\n❌ {str(e)}"
+            try:
+                asyncio.run(self.send_telegram(error_msg))
+            except:
+                pass
+            raise
 
 
-# ============================================================
-# 웹훅 라우트
-# ============================================================
-
-@flask_app.route(f'/webhook/{TELEGRAM_TOKEN}', methods=['POST'])
-def webhook():
-    data = request.get_json()
-    if not data:
-        return 'OK'
-
-    # callback_query만 처리
-    callback_query = data.get('callback_query')
-    if not callback_query:
-        return 'OK'
-
-    callback_data = callback_query.get('data', '')
-    callback_id = callback_query['id']
-    message = callback_query.get('message', {})
-    chat_id = message.get('chat', {}).get('id')
-    message_id = message.get('message_id')
-
-    bot_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
-    now_str = datetime.now(est).strftime('%H:%M EST')
-
-    # answer callback query
-    requests.post(f"{bot_url}/answerCallbackQuery", json={'callback_query_id': callback_id})
-
-    if callback_data == 'trade_complete':
-        miniapp_url = f"{RENDER_URL}/miniapp"
-        keyboard = {'inline_keyboard': [[{
-            'text': '📝 체결가 입력',
-            'web_app': {'url': miniapp_url}
-        }]]}
-        requests.post(f"{bot_url}/editMessageReplyMarkup", json={
-            'chat_id': chat_id,
-            'message_id': message_id,
-            'reply_markup': keyboard
-        })
-
-    elif callback_data == 'trade_watch':
-        keyboard = {'inline_keyboard': [[{
-            'text': f'👀 관망 중 ({now_str})',
-            'callback_data': 'noop'
-        }]]}
-        requests.post(f"{bot_url}/editMessageReplyMarkup", json={
-            'chat_id': chat_id,
-            'message_id': message_id,
-            'reply_markup': keyboard
-        })
-
-    elif callback_data == 'trade_ignore':
-        keyboard = {'inline_keyboard': [[{
-            'text': f'❌ 무시됨 ({now_str})',
-            'callback_data': 'noop'
-        }]]}
-        requests.post(f"{bot_url}/editMessageReplyMarkup", json={
-            'chat_id': chat_id,
-            'message_id': message_id,
-            'reply_markup': keyboard
-        })
-
-    return 'OK'
+def is_market_open():
+    est = pytz.timezone('America/New_York')
+    now = datetime.now(est)
+    if now.weekday() >= 5:
+        print(f"📅 주말 ({now.strftime('%A')}) — 스킵")
+        return False
+    us_holidays = [
+        '2026-01-01', '2026-01-19', '2026-02-16', '2026-04-03',
+        '2026-05-25', '2026-06-19', '2026-07-03', '2026-09-07',
+        '2026-11-26', '2026-12-25',
+    ]
+    if now.strftime('%Y-%m-%d') in us_holidays:
+        print(f"📅 휴장일 — 스킵")
+        return False
+    return True
 
 
-# ============================================================
-# 웹훅 설정 (Render 배포 시 자동 설정)
-# ============================================================
-
-async def setup_webhook():
-    if not RENDER_URL or not RENDER_URL.startswith('https://'):
-        print(f"⚠️ 웹훅 설정 건너뜀: RENDER_URL이 유효하지 않음 ({repr(RENDER_URL)})")
-        print("   → Render 대시보드에서 RENDER_EXTERNAL_URL 또는 RENDER_URL 환경변수를 확인하세요")
-        return
-
-    bot = Bot(token=TELEGRAM_TOKEN)
-    webhook_url = f"{RENDER_URL}/webhook/{TELEGRAM_TOKEN}"
-    await bot.set_webhook(webhook_url)
-    print(f"✅ 웹훅 설정 완료: {RENDER_URL}/webhook/[TOKEN HIDDEN]")
-
-# ============================================================
-# 메인
-# ============================================================
-
-if __name__ == '__main__':
-    import asyncio
-
-    # 웹훅 설정
-    asyncio.run(setup_webhook())
-
-    port = int(os.environ.get('PORT', 5000))
-    flask_app.run(host='0.0.0.0', port=port)
-
+if __name__ == "__main__":
+    if not is_market_open():
+        print("🛑 장 휴무 — 스킵")
+    else:
+        reporter = MarketCloseReport()
+        reporter.run()
 
