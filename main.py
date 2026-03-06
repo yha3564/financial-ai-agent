@@ -282,6 +282,117 @@ class DailyDigest:
                 self.ticker_names[asset['ticker']] = asset.get('name', asset['ticker'])
 
     # --------------------------------------------------------
+    # 자가학습: 추천 이력 저장/평가
+    # --------------------------------------------------------
+    def save_recommendation_history(self, recommendations, rankings):
+        """오늘 추천 내용 + 현재 가격 저장"""
+        try:
+            history = []
+            try:
+                with open('recommendation_history.json', 'r') as f:
+                    history = json.load(f)
+            except FileNotFoundError:
+                history = []
+
+            today_entry = {
+                'date': self.now.strftime('%Y-%m-%d'),
+                'recommendations': [],
+                'market_context': {}
+            }
+
+            # TFSA1 추천 저장
+            for action in recommendations.get('tfsa1', []):
+                today_entry['recommendations'].append({
+                    'ticker': action['ticker'],
+                    'action': action['action'],
+                    'price_at_rec': action.get('price', 0),
+                    'score': action.get('score', 0),
+                    'expected_pct': action.get('expected_pct', 0)
+                })
+
+            # 상위 5개 랭킹 저장
+            for r in rankings[:5]:
+                today_entry['market_context'][r['ticker']] = {
+                    'score': r['weighted_score'],
+                    'price': self.get_price(r['ticker'])
+                }
+
+            # 최근 30일만 유지
+            history.append(today_entry)
+            history = history[-30:]
+
+            with open('recommendation_history.json', 'w') as f:
+                json.dump(history, f, indent=2, ensure_ascii=False)
+            print("📝 추천 이력 저장 완료")
+        except Exception as e:
+            print(f"⚠️ 추천 이력 저장 실패: {e}")
+
+    def evaluate_past_recommendations(self):
+        """과거 추천 결과 평가 → AI 프롬프트용 피드백 생성"""
+        try:
+            with open('recommendation_history.json', 'r') as f:
+                history = json.load(f)
+        except FileNotFoundError:
+            return ""
+
+        if len(history) < 2:
+            return ""
+
+        feedback_lines = []
+        correct = 0
+        total = 0
+
+        # 최근 7일 추천만 평가
+        recent = history[-8:-1]  # 어제~7일전 (오늘 제외)
+        for entry in recent:
+            date = entry.get('date', '')
+            for rec in entry.get('recommendations', []):
+                ticker = rec['ticker']
+                action = rec['action']
+                price_then = rec.get('price_at_rec', 0)
+                expected_pct = rec.get('expected_pct', 0)
+
+                if price_then <= 0 or action == 'HOLD':
+                    continue
+
+                price_now = self.get_price(ticker)
+                if price_now <= 0:
+                    continue
+
+                actual_pct = (price_now - price_then) / price_then * 100
+                total += 1
+
+                if action == 'BUY' and actual_pct > 0:
+                    correct += 1
+                    result = "✅"
+                elif action == 'SELL' and actual_pct < 0:
+                    correct += 1
+                    result = "✅"
+                else:
+                    result = "❌"
+
+                feedback_lines.append(
+                    f"{date} {ticker} {action} @${price_then:.2f} → now ${price_now:.2f} ({actual_pct:+.1f}%) {result}"
+                )
+
+        if total == 0:
+            return ""
+
+        accuracy = correct / total * 100
+        feedback = f"\n\nPAST RECOMMENDATION ACCURACY ({correct}/{total} = {accuracy:.0f}%):\n"
+        feedback += "\n".join(feedback_lines[-10:])  # 최근 10개만
+        feedback += f"\n\nUse this track record to calibrate your confidence levels. "
+        if accuracy < 50:
+            feedback += "Recent predictions were mostly wrong - be more conservative with magnitude and confidence."
+        elif accuracy > 70:
+            feedback += "Recent predictions were accurate - maintain current analysis approach."
+        else:
+            feedback += "Mixed results - focus on high-confidence signals only."
+
+        print(f"📊 자가학습: 적중률 {accuracy:.0f}% ({correct}/{total})")
+        return feedback
+
+    # --------------------------------------------------------
     # 가격 조회 (캐시)
     # --------------------------------------------------------
     def get_price(self, ticker):
@@ -408,6 +519,9 @@ class DailyDigest:
             body = n.get('content') or n.get('description') or ''
             news_text += f"[{i}] {n['title']}\n{body[:300]}\n\n"
 
+        # 자가학습 피드백
+        learning_feedback = self.evaluate_past_recommendations()
+
         prompt = f"""Analyze these {len(news_batch)} news articles and their impact on assets.
 
 NEWS:
@@ -427,7 +541,7 @@ Rules:
 - confidence: 0 to 100
 - Only include assets with REAL significant impact
 - neutral assets: skip entirely
-- Return ONLY valid JSON, no markdown"""
+- Return ONLY valid JSON, no markdown{learning_feedback}"""
 
         for attempt in range(3):
             try:
@@ -1165,6 +1279,9 @@ JSON만 반환. key_bullish/key_bearish의 assets는 영향받는 보유자산 �
             }
 
             asyncio.run(self.send_telegram(report, with_buttons=True, pending_trades=pending_trades))
+
+            # 자가학습: 추천 이력 저장
+            self.save_recommendation_history(recommendations, rankings)
 
             if afterhours_news:
                 self.clear_afterhours_news()
