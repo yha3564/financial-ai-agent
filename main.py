@@ -35,7 +35,8 @@ class PriceCache:
 
         try:
             tickers_str = " ".join(tickers)
-            df = yf.download(tickers_str, period="5d", auto_adjust=True,
+            # [수정 1] period "5d" → "60d" (RSI 14일, MACD 26+9=35일 계산 여유분 확보)
+            df = yf.download(tickers_str, period="60d", auto_adjust=True,
                            progress=False, threads=False)
 
             if df.empty:
@@ -82,7 +83,8 @@ class PriceCache:
         """개별 티커 다운로드 (폴백)"""
         for ticker in tickers:
             try:
-                df = yf.download(ticker, period="5d", auto_adjust=True,
+                # [수정 1] period "60d" 통일
+                df = yf.download(ticker, period="60d", auto_adjust=True,
                                progress=False, threads=False)
                 if not df.empty and 'Close' in df.columns:
                     data = df['Close'].dropna()
@@ -102,7 +104,7 @@ class PriceCache:
         return self._hist_cache.get(ticker, pd.DataFrame())
 
     def get_dividend_yields(self, tickers):
-        """배당수익률 일괄 조회"""
+        """배당수익률 조회 — 보유 자산(소수)만 조회"""
         div_map = {}
         for ticker in tickers:
             try:
@@ -113,14 +115,14 @@ class PriceCache:
         return div_map
 
     def get_fx_trend(self):
-        """CAD/USD 환율 추세 (양수=CAD강세=USD자산불리, 음수=CAD약세=USD자산유리)"""
+        """CAD/USD 환율 추세"""
         try:
             df = yf.download('CADUSD=X', period='5d', auto_adjust=True, progress=False)
             if not df.empty and len(df) >= 2:
                 data = df['Close'].dropna()
                 recent = float(data.iloc[-1])
                 prev = float(data.iloc[0])
-                return (recent - prev) / prev  # 양수 = CAD 강세
+                return (recent - prev) / prev
             return 0
         except:
             return 0
@@ -130,10 +132,10 @@ class PriceCache:
 # 메인 클래스
 # ============================================================
 class DailyDigest:
-    """아침 종합 브리핑 v4.0"""
+    """아침 종합 브리핑 v4.1"""
 
     def __init__(self):
-        print("🚀 Daily Digest v4.0 초기화...")
+        print("🚀 Daily Digest v4.1 초기화...")
 
         self.news_api_key = os.environ['NEWS_API_KEY']
         self.groq_api_key = os.environ['GROQ_API_KEY']
@@ -163,13 +165,33 @@ class DailyDigest:
 
         self.cost_settings = self.config.get('cost_settings', {})
         self.trading_rules = self.config.get('trading_rules', {})
-        self.alternative_assets = [a['ticker'] for a in self.config.get('alternative_assets', [])]
+
+        # [수정 3] portfolio.yaml + hot_stocks.yaml 병합
+        alt_assets = self.config.get('alternative_assets', [])
+        try:
+            with open('hot_stocks.yaml', 'r', encoding='utf-8') as f:
+                hot = yaml.safe_load(f) or {}
+            hot_assets = hot.get('assets', [])
+            # 중복 제거 (ticker 기준)
+            existing_tickers = {a['ticker'] for a in alt_assets}
+            for asset in hot_assets:
+                if asset['ticker'] not in existing_tickers:
+                    alt_assets.append(asset)
+            print(f"🔥 핫종목 {len(hot_assets)}개 병합 완료")
+        except FileNotFoundError:
+            print("📂 hot_stocks.yaml 없음 — 기본 alternative_assets만 사용")
+
+        self.alternative_assets = [a['ticker'] for a in alt_assets]
         self.safe_assets = [a['ticker'] for a in self.config.get('safe_assets', [])]
 
         self.mer_map = {}
         for section in ['tfsa1_assets', 'tfsa2_assets', 'alternative_assets', 'safe_assets']:
             for asset in self.config.get(section, []):
                 self.mer_map[asset['ticker']] = asset.get('mer', 0.003)
+        # hot_stocks MER도 추가
+        for asset in alt_assets:
+            if asset['ticker'] not in self.mer_map:
+                self.mer_map[asset['ticker']] = asset.get('mer', 0)
 
         self.load_portfolio()
 
@@ -183,24 +205,25 @@ class DailyDigest:
         self.price_cache.batch_download(all_tickers)
         self.all_tracked_assets = all_tickers
 
-        # 배당수익률 로드
+        # [수정 5] 배당수익률 — 보유 자산(소수)만 조회 (100+ API 호출 방지)
         held_tickers = list(set(
             list(self.my_holdings_tfsa1.keys()) +
             list(self.my_holdings_tfsa2.keys())
         ))
-        self.dividend_yields = self.price_cache.get_dividend_yields(held_tickers + self.alternative_assets + self.safe_assets)
-        print(f"💰 배당률 로드 완료")
+        self.dividend_yields = self.price_cache.get_dividend_yields(held_tickers)
+        # alternative_assets 배당률은 0으로 (스코어 영향 미미)
+        for t in self.alternative_assets + self.safe_assets:
+            if t not in self.dividend_yields:
+                self.dividend_yields[t] = 0
+        print(f"💰 배당률 로드 완료 (보유자산 {len(held_tickers)}개)")
 
-        # 환율 추세
         self.fx_trend = self.price_cache.get_fx_trend()
         fx_dir = "CAD강세(USD불리)" if self.fx_trend > 0.005 else "CAD약세(USD유리)" if self.fx_trend < -0.005 else "안정"
         print(f"💱 환율 추세: {self.fx_trend:+.3f} ({fx_dir})")
 
-        # 보유기간 (portfolio.json의 date 기반 추정)
         self.holding_months = {}
         buy_date_str = self.last_cash_added or self.now.strftime('%Y-%m-%d')
         for t in list(self.my_holdings_tfsa1.keys()) + list(self.my_holdings_tfsa2.keys()):
-            # 기본 3개월, 향후 buy_date 추적 시 정확해짐
             self.holding_months[t] = self.cost_settings.get('default_holding_months', 3)
 
         self.build_ticker_name_map()
@@ -282,10 +305,9 @@ class DailyDigest:
                 self.ticker_names[asset['ticker']] = asset.get('name', asset['ticker'])
 
     # --------------------------------------------------------
-    # 자가학습: 추천 이력 저장/평가
+    # 자가학습
     # --------------------------------------------------------
     def save_recommendation_history(self, recommendations, rankings):
-        """오늘 추천 내용 + 현재 가격 저장"""
         try:
             history = []
             try:
@@ -300,7 +322,6 @@ class DailyDigest:
                 'market_context': {}
             }
 
-            # TFSA1 추천 저장
             for action in recommendations.get('tfsa1', []):
                 today_entry['recommendations'].append({
                     'ticker': action['ticker'],
@@ -310,14 +331,12 @@ class DailyDigest:
                     'expected_pct': action.get('expected_pct', 0)
                 })
 
-            # 상위 5개 랭킹 저장
             for r in rankings[:5]:
                 today_entry['market_context'][r['ticker']] = {
                     'score': r['weighted_score'],
                     'price': self.get_price(r['ticker'])
                 }
 
-            # 최근 30일만 유지
             history.append(today_entry)
             history = history[-30:]
 
@@ -328,7 +347,6 @@ class DailyDigest:
             print(f"⚠️ 추천 이력 저장 실패: {e}")
 
     def evaluate_past_recommendations(self):
-        """과거 추천 결과 평가 → AI 프롬프트용 피드백 생성"""
         try:
             with open('recommendation_history.json', 'r') as f:
                 history = json.load(f)
@@ -342,8 +360,7 @@ class DailyDigest:
         correct = 0
         total = 0
 
-        # 최근 7일 추천만 평가
-        recent = history[-8:-1]  # 어제~7일전 (오늘 제외)
+        recent = history[-8:-1]
         for entry in recent:
             date = entry.get('date', '')
             for rec in entry.get('recommendations', []):
@@ -380,12 +397,12 @@ class DailyDigest:
 
         accuracy = correct / total * 100
         feedback = f"\n\nPAST RECOMMENDATION ACCURACY ({correct}/{total} = {accuracy:.0f}%):\n"
-        feedback += "\n".join(feedback_lines[-10:])  # 최근 10개만
+        feedback += "\n".join(feedback_lines[-10:])
         feedback += f"\n\nUse this track record to calibrate your confidence levels. "
         if accuracy < 50:
-            feedback += "Recent predictions were mostly wrong - be more conservative with magnitude and confidence."
+            feedback += "Recent predictions were mostly wrong - be more conservative."
         elif accuracy > 70:
-            feedback += "Recent predictions were accurate - maintain current analysis approach."
+            feedback += "Recent predictions were accurate - maintain current approach."
         else:
             feedback += "Mixed results - focus on high-confidence signals only."
 
@@ -411,10 +428,145 @@ class DailyDigest:
         return 0
 
     # --------------------------------------------------------
-    # 뉴스 수집
+    # [수정 4] 장후 뉴스 직접 수집 (전날 16:30 EST 이후)
+    # afterhours_collector.py 삭제 → 여기서 직접 수집
+    # --------------------------------------------------------
+    def _parse_published_dt(self, news_item):
+        """뉴스 발행 시간 파싱 → UTC datetime 반환 (실패 시 None)"""
+        pub = news_item.get('publishedAt', '') or news_item.get('published', '')
+        if not pub:
+            return None
+        try:
+            if 'T' in pub:
+                return datetime.fromisoformat(pub.replace('Z', '+00:00')).astimezone(pytz.utc)
+        except Exception:
+            pass
+        return None
+
+    def collect_afterhours_news(self):
+        """전날 16:30 EST 이후 뉴스 수집 (장후 + 심야 + 장전)"""
+        print("\n🌙 장후 뉴스 수집 중 (전날 16:30 이후)...")
+
+        # cutoff: 오전 09:30 이전이면 전날 16:30, 이후면 오늘 16:30 (당일 장 마감 기준)
+        if self.now.hour < 9 or (self.now.hour == 9 and self.now.minute < 30):
+            base = self.now - timedelta(days=1)
+        else:
+            base = self.now
+        cutoff_est = base.replace(hour=16, minute=30, second=0, microsecond=0)
+        cutoff_utc = cutoff_est.astimezone(pytz.utc)
+        print(f"   기준 시간: {cutoff_est.strftime('%Y-%m-%d %H:%M EST')} 이후")
+
+        all_news = []
+        seen_urls = set()
+
+        # 1. NewsAPI top-headlines → published 시간으로 필터
+        for category in ['business', 'technology']:
+            try:
+                response = requests.get(
+                    "https://newsapi.org/v2/top-headlines",
+                    params={
+                        'language': 'en',
+                        'apiKey': self.news_api_key,
+                        'pageSize': 100,
+                        'category': category,
+                        'country': 'us'
+                    },
+                    timeout=10
+                )
+                if response.status_code == 200:
+                    for a in response.json().get('articles', []):
+                        url = a.get('url', '')
+                        if not url or url in seen_urls:
+                            continue
+                        # 시간 필터
+                        pub_str = a.get('publishedAt', '')
+                        if pub_str:
+                            try:
+                                pub_dt = datetime.fromisoformat(
+                                    pub_str.replace('Z', '+00:00'))
+                                if pub_dt < cutoff_utc:
+                                    continue
+                            except Exception:
+                                pass
+                        seen_urls.add(url)
+                        all_news.append({
+                            'title': a.get('title', ''),
+                            'description': a.get('description', ''),
+                            'url': url,
+                            'source': a.get('source', {}).get('name', ''),
+                            'publishedAt': pub_str,
+                            'content': ''
+                        })
+                print(f"   NewsAPI {category}: {len(all_news)}개")
+            except Exception as e:
+                print(f"   ❌ NewsAPI {category}: {e}")
+
+        # 2. RSS 피드 → published 시간으로 필터
+        rss_feeds = [
+            ('Reuters Business', 'https://feeds.reuters.com/reuters/businessNews'),
+            ('Reuters Finance', 'https://feeds.reuters.com/reuters/financialNews'),
+            ('AP Business', 'https://feeds.apnews.com/apnews/business'),
+            ('Yahoo Finance', 'https://finance.yahoo.com/news/rssindex'),
+            ('MarketWatch', 'https://feeds.marketwatch.com/marketwatch/topstories'),
+            ('MarketWatch RT', 'https://feeds.marketwatch.com/marketwatch/realtimeheadlines'),
+        ]
+        for source, feed_url in rss_feeds:
+            try:
+                feed = feedparser.parse(feed_url)
+                count = 0
+                for entry in feed.entries[:30]:
+                    url = entry.get('link', '')
+                    if not url or url in seen_urls:
+                        continue
+                    # 시간 필터
+                    pub_parsed = entry.get('published_parsed')
+                    if pub_parsed:
+                        pub_dt = datetime(*pub_parsed[:6], tzinfo=pytz.utc)
+                        if pub_dt < cutoff_utc:
+                            continue
+                    seen_urls.add(url)
+                    content = entry.get('summary', '') or ''
+                    if content:
+                        content = BeautifulSoup(content, 'html.parser').get_text()[:500]
+                    pub_str = entry.get('published', '')
+                    all_news.append({
+                        'title': entry.get('title', ''),
+                        'description': entry.get('summary', '')[:200],
+                        'url': url,
+                        'source': source,
+                        'publishedAt': pub_str,
+                        'content': content
+                    })
+                    count += 1
+                print(f"   RSS {source}: {count}개")
+            except Exception as e:
+                print(f"   ❌ RSS {source}: {e}")
+
+        # 3. 크롤링 (본문 없는 뉴스)
+        crawl_count = 0
+        for news in all_news:
+            if not news['content'] and news['url'] and crawl_count < 20:
+                try:
+                    resp = requests.get(news['url'], timeout=5,
+                                       headers={'User-Agent': 'Mozilla/5.0'})
+                    if resp.status_code == 200:
+                        soup = BeautifulSoup(resp.text, 'html.parser')
+                        for tag in soup(['script', 'style', 'nav', 'header', 'footer']):
+                            tag.decompose()
+                        content = ' '.join([p.get_text() for p in soup.find_all('p')[:8]])[:600]
+                        news['content'] = content
+                        crawl_count += 1
+                except Exception:
+                    pass
+
+        print(f"✅ 장후 뉴스 {len(all_news)}개 수집 (크롤링 {crawl_count}개)")
+        return all_news
+
+    # --------------------------------------------------------
+    # 아침 뉴스 수집
     # --------------------------------------------------------
     def collect_all_news(self):
-        print("\n📰 뉴스 수집 중...")
+        print("\n📰 아침 뉴스 수집 중...")
         all_news = []
         seen_urls = set()
 
@@ -437,6 +589,7 @@ class DailyDigest:
                                 'description': a.get('description', ''),
                                 'url': url,
                                 'source': a.get('source', {}).get('name', ''),
+                                'publishedAt': a.get('publishedAt', ''),
                                 'content': ''
                             })
                     print(f"   NewsAPI {category}: {len(articles)}개")
@@ -464,6 +617,7 @@ class DailyDigest:
                             'description': entry.get('summary', '')[:200],
                             'url': url,
                             'source': source,
+                            'publishedAt': entry.get('published', ''),
                             'content': content
                         })
                 print(f"   RSS {source}: {len(feed.entries[:20])}개")
@@ -484,29 +638,11 @@ class DailyDigest:
                         content = ' '.join([p.get_text() for p in paragraphs[:10]])[:800]
                         news['content'] = content
                         crawl_count += 1
-                except:
+                except Exception:
                     pass
 
-        print(f"✅ 총 {len(all_news)}개 수집 (크롤링 {crawl_count}개)")
-        return all_news[:100]
-
-    # --------------------------------------------------------
-    # 장후 뉴스 로드
-    # --------------------------------------------------------
-    def load_afterhours_news(self):
-        try:
-            with open('afterhours_news.json', 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            news_list = data.get('news', [])
-            print(f"📌 장후 뉴스 로드: {len(news_list)}개")
-            return news_list
-        except FileNotFoundError:
-            print("📌 장후 뉴스 없음")
-            return []
-
-    def clear_afterhours_news(self):
-        with open('afterhours_news.json', 'w', encoding='utf-8') as f:
-            json.dump({'news': [], 'date': self.now.strftime('%Y-%m-%d')}, f)
+        print(f"✅ 아침 뉴스 {len(all_news)}개 수집 (크롤링 {crawl_count}개)")
+        return all_news
 
     # --------------------------------------------------------
     # AI 뉴스 분석
@@ -519,7 +655,6 @@ class DailyDigest:
             body = n.get('content') or n.get('description') or ''
             news_text += f"[{i}] {n['title']}\n{body[:300]}\n\n"
 
-        # 자가학습 피드백
         learning_feedback = self.evaluate_past_recommendations()
 
         prompt = f"""Analyze these {len(news_batch)} news articles and their impact on assets.
@@ -577,16 +712,34 @@ Rules:
             return {}
 
     def aggregate_asset_impacts(self, all_news):
-        print("\n🧠 AI 뉴스 영향 분석 중 (배치 처리)...")
+        """
+        [수정 4] 시간 가중치 적용:
+        - 뉴스를 발행 시간순 정렬 (오래된 → 최신)
+        - 배치 위치에 따라 time_weight 0.5(오래된) ~ 1.0(최신) 적용
+        - 동일 자산 최신 뉴스 우선, 전 뉴스도 반영
+        """
+        print("\n🧠 AI 뉴스 영향 분석 중 (시간 가중치 적용)...")
+
+        # 발행 시간순 정렬 (오래된 것부터)
+        def sort_key(n):
+            dt = self._parse_published_dt(n)
+            return dt if dt else datetime(2000, 1, 1, tzinfo=pytz.utc)
+
+        all_news_sorted = sorted(all_news, key=sort_key)
 
         asset_scores = {ticker: {'total': 0, 'confidences': [], 'reasons': [], 'count': 0}
                         for ticker in self.all_tracked_assets}
 
         batch_size = 10
-        batches = [all_news[i:i+batch_size] for i in range(0, len(all_news), batch_size)]
+        batches = [all_news_sorted[i:i+batch_size]
+                   for i in range(0, len(all_news_sorted), batch_size)]
+        total_batches = len(batches)
 
         for i, batch in enumerate(batches):
-            print(f"   배치 [{i+1}/{len(batches)}] {len(batch)}개 뉴스 분석 중...")
+            # time_weight: 오래된 배치 0.5, 최신 배치 1.0 (선형)
+            time_weight = 0.5 + ((i + 1) / total_batches) * 0.5 if total_batches > 1 else 1.0
+            print(f"   배치 [{i+1}/{total_batches}] {len(batch)}개 뉴스 (time_weight={time_weight:.2f})...")
+
             impacts = self.analyze_news_batch(batch)
 
             for ticker, data in impacts.items():
@@ -602,11 +755,12 @@ Rules:
                         elif impact == 'neutral':
                             magnitude = 0
 
-                        asset_scores[ticker]['total'] += magnitude
+                        # 시간 가중치 적용
+                        asset_scores[ticker]['total'] += magnitude * time_weight
                         asset_scores[ticker]['confidences'].append(confidence)
                         asset_scores[ticker]['reasons'].append(reason)
                         asset_scores[ticker]['count'] += 1
-                    except:
+                    except Exception:
                         pass
 
         results = {}
@@ -630,7 +784,7 @@ Rules:
                     'news_count': 0
                 }
 
-        print(f"✅ 분석 완료 (배치 {len(batches)}번 호출)")
+        print(f"✅ 분석 완료 (배치 {total_batches}번 호출)")
         return results
 
     # --------------------------------------------------------
@@ -644,7 +798,6 @@ Rules:
         for n in afterhours_news[:30]:
             news_text += f"- {n.get('title', '')}\n"
 
-        # 보유자산 목록 포함
         holdings_str = ", ".join(list(self.my_holdings_tfsa1.keys()) + list(self.my_holdings_tfsa2.keys()))
         tracked_str = ", ".join(self.all_tracked_assets[:30])
 
@@ -683,27 +836,27 @@ Rules:
                 text = response.choices[0].message.content
                 text = text.replace('```json', '').replace('```', '').strip()
                 return json.loads(text)
-            except:
+            except Exception:
                 if attempt < 2:
                     time.sleep(5)
                     continue
-            if not self.gemini:
-                return None
-            try:
-                if USE_NEW_GENAI:
-                    response = self.gemini.models.generate_content(
-                        model='gemini-2.0-flash', contents=prompt)
-                    text = response.text
-                else:
-                    response = self.gemini.generate_content(prompt)
-                    text = response.text
-                text = text.replace('```json', '').replace('```', '').strip()
-                return json.loads(text)
-            except:
-                return None
+        if not self.gemini:
+            return None
+        try:
+            if USE_NEW_GENAI:
+                response = self.gemini.models.generate_content(
+                    model='gemini-2.0-flash', contents=prompt)
+                text = response.text
+            else:
+                response = self.gemini.generate_content(prompt)
+                text = response.text
+            text = text.replace('```json', '').replace('```', '').strip()
+            return json.loads(text)
+        except Exception:
+            return None
 
     # --------------------------------------------------------
-    # 기술적 분석
+    # 기술적 분석 (캐시 사용)
     # --------------------------------------------------------
     def technical_analysis(self, ticker):
         try:
@@ -719,7 +872,6 @@ Rules:
             macd_bullish = df['MACD_12_26_9'].iloc[-1] > df['MACDs_12_26_9'].iloc[-1]
 
             df['ma_20'] = df['Close'].rolling(20).mean()
-            df['ma_50'] = df['Close'].rolling(50).mean()
             above_ma = df['Close'].iloc[-1] > df['ma_20'].iloc[-1]
 
             if current_rsi < 30 and macd_bullish:
@@ -728,7 +880,7 @@ Rules:
                 return {'signal': 'sell', 'rsi': current_rsi}
             else:
                 return {'signal': 'neutral', 'rsi': current_rsi}
-        except:
+        except Exception:
             return {'signal': 'neutral', 'rsi': 50}
 
     # --------------------------------------------------------
@@ -753,30 +905,24 @@ Rules:
             elif tech['signal'] == 'buy' and weighted_score < 0:
                 weighted_score *= 0.8
 
-            # (6) 배당수익률 가산: 연배당률 × 보유기간/12
             div_yield = self.dividend_yields.get(ticker, 0)
             hold_months = self.holding_months.get(ticker, default_hold)
             div_bonus = div_yield * (hold_months / 12)
             weighted_score += div_bonus
 
-            # (7) 보유기간 가중치: 장기보유 자산은 단기뉴스 영향 축소
             if ticker in self.my_holdings_tfsa1 or ticker in self.my_holdings_tfsa2:
                 if hold_months >= 6:
-                    news_dampen = 0.7  # 6개월+ 보유 → 뉴스 영향 30% 축소
+                    news_dampen = 0.7
                 elif hold_months >= 3:
                     news_dampen = 0.85
                 else:
                     news_dampen = 1.0
-                # 뉴스 기반 점수만 축소 (배당 보너스 제외)
                 news_only = weighted_score - div_bonus
                 weighted_score = (news_only * news_dampen) + div_bonus
 
-            # (9) 환율 방향성: USD 자산 점수 조정
             is_usd = not ticker.endswith('.TO')
             if is_usd and abs(self.fx_trend) > 0.005:
-                # CAD 강세(fx_trend>0) → USD 자산 불리 → 점수 감소
-                # CAD 약세(fx_trend<0) → USD 자산 유리 → 점수 증가
-                fx_adj = -self.fx_trend * 0.5  # 환율 변동의 50% 반영
+                fx_adj = -self.fx_trend * 0.5
                 weighted_score += fx_adj
 
             mer = self.mer_map.get(ticker, 0.003)
@@ -800,20 +946,16 @@ Rules:
         return rankings
 
     def calc_swap_cost(self, sell_ticker, buy_ticker, value):
-        """스왑 시 거래비용 계산 (Wealthsimple 기준)"""
         fx_fee = self.cost_settings.get('fx_fee', 0.015)
         cost = 0
         if not sell_ticker.endswith('.TO'):
-            cost += value * fx_fee  # USD→CAD
+            cost += value * fx_fee
         if not buy_ticker.endswith('.TO'):
-            cost += value * fx_fee  # CAD→USD
+            cost += value * fx_fee
         return cost
 
     # --------------------------------------------------------
     # 추천 생성
-    # IMP-006/007: 모든 매도 후 즉시 대안자산 재투자 (현금 대기 금지)
-    #              예외: 스캔한 모든 alternative_assets 점수 음수 시만 현금 보유
-    # IMP-002:     각 액션에 recommended_price / recommended_at 저장
     # --------------------------------------------------------
     def generate_recommendations(self, rankings):
         print("\n💡 추천 생성 중...")
@@ -834,7 +976,6 @@ Rules:
         half_threshold = tfsa1_rules.get('half_sell_threshold', 0.25)
         full_threshold = tfsa1_rules.get('full_sell_threshold', 0.35)
 
-        # STEP 1: 매도 판단
         for ticker, holding in self.my_holdings_tfsa1.items():
             rank = rankings_map.get(ticker, {})
             score = rank.get('weighted_score', 0)
@@ -848,8 +989,8 @@ Rules:
                     'ticker': ticker, 'shares': shares,
                     'price': current_price, 'value': current_value,
                     'score': score, 'expected_pct': score * 100,
-                    'recommended_price': current_price,   # IMP-002
-                    'recommended_at': recommended_at       # IMP-002
+                    'recommended_price': current_price,
+                    'recommended_at': recommended_at
                 })
                 sell_proceeds += current_value
 
@@ -883,11 +1024,10 @@ Rules:
         available_cash += sell_proceeds
         sold_tickers = [a['ticker'] for a in tfsa1_actions if a['action'] == 'SELL' and a['type'] == 'full']
 
-        # STEP 2: 매수 후보 (뉴스 영향이 실제로 있는 것만)
         buy_candidates = [
             r for r in rankings
             if r['weighted_score'] > alert_threshold
-            and r['magnitude'] > 0  # 실제 뉴스 영향이 있어야 매수
+            and r['magnitude'] > 0
             and r['ticker'] not in sold_tickers
             and self.get_price(r['ticker']) > 0
         ]
@@ -923,10 +1063,8 @@ Rules:
                         'recommended_at': recommended_at
                     })
 
-        # STEP 4: 스왑 판단 (상대비교 + 부분매도 + 보유간 비교)
         has_buy = any(a['action'] == 'BUY' for a in tfsa1_actions)
         if not has_buy:
-            # 보유 자산 목록
             held = []
             for t in self.my_holdings_tfsa1:
                 if t in sold_tickers:
@@ -945,7 +1083,6 @@ Rules:
                 weakest = min(held, key=lambda x: x['weighted_score'])
                 strongest = max(held, key=lambda x: x['weighted_score'])
 
-                # 대체자산 1위 vs 보유 최강 중 높은 쪽이 매수 대상
                 best_external = buy_candidates[0] if buy_candidates else None
                 if best_external and best_external['weighted_score'] > strongest['weighted_score']:
                     buy_target = best_external
@@ -964,7 +1101,6 @@ Rules:
                     score_gap = buy_target['weighted_score'] - weakest['weighted_score'] - cost_as_score
 
                     if score_gap > 0:
-                        # 점수 차이에 따라 매도 비율
                         if score_gap >= 0.15 or weakest['weighted_score'] < -0.10:
                             sell_pct, sell_type = 1.0, 'full'
                         elif score_gap >= 0.08:
@@ -976,7 +1112,7 @@ Rules:
                         sell_value = sell_shares * w_price
                         actual_cost = self.calc_swap_cost(w_ticker, buy_target['ticker'], sell_value)
 
-                        print(f"   🔄 스왑: {w_ticker}({weakest['weighted_score']:.3f}) → {buy_target['ticker']}({buy_target['weighted_score']:.3f}), gap={score_gap:.3f}, type={sell_type}")
+                        print(f"   🔄 스왑: {w_ticker}({weakest['weighted_score']:.3f}) → {buy_target['ticker']}({buy_target['weighted_score']:.3f})")
                         tfsa1_actions.append({
                             'action': 'SELL', 'type': sell_type,
                             'ticker': w_ticker, 'shares': sell_shares,
@@ -1005,7 +1141,14 @@ Rules:
         # ── TFSA 2 ──
         tfsa2_actions = {}
         full_threshold_t2 = tfsa2_rules.get('full_sell_threshold', 0.30)
-        safe_rankings = [r for r in rankings if r['ticker'] in self.safe_assets]
+
+        # [수정 7] safe_rankings에서 현재 TFSA2 보유 자산 제외 → 순환 추천 방지
+        held_tfsa2_tickers = set(self.my_holdings_tfsa2.keys())
+        safe_rankings = [
+            r for r in rankings
+            if r['ticker'] in self.safe_assets
+            and r['ticker'] not in held_tfsa2_tickers
+        ]
         safe_rankings.sort(key=lambda x: x['net_score'], reverse=True)
 
         for ticker, holding in self.my_holdings_tfsa2.items():
@@ -1019,10 +1162,9 @@ Rules:
             actions = []
 
             best_alternative = None
-            # 다른 TFSA2 보유 자산은 후보에서 제외 (목적 자금 합치기 방지)
-            other_tfsa2_tickers = [t for t in self.my_holdings_tfsa2 if t != ticker]
+            other_tfsa2_tickers = {t for t in self.my_holdings_tfsa2 if t != ticker}
             for safe in safe_rankings:
-                if safe['ticker'] != ticker and safe['ticker'] not in other_tfsa2_tickers:
+                if safe['ticker'] not in other_tfsa2_tickers:
                     best_alternative = safe
                     break
 
@@ -1030,7 +1172,6 @@ Rules:
                 swap_cost = self.calc_swap_cost(ticker, best_alternative['ticker'], current_value)
                 cost_as_score = swap_cost / current_value if current_value > 0 else 0
 
-                # 대안 점수 > 보유 점수 + 거래비용 → 교체
                 if best_alternative['net_score'] > score + cost_as_score:
                     best_price = self.get_price(best_alternative['ticker'])
                     actual_buy_value = current_value - swap_cost
@@ -1053,7 +1194,7 @@ Rules:
                         'expected_pct': best_alternative['weighted_score'] * 100,
                         'recommended_price': best_price,
                         'recommended_at': recommended_at,
-                        'origin_ticker': ticker  # 본체 추적: 원래 어떤 자산이었는지
+                        'origin_ticker': ticker
                     })
                 else:
                     actions.append({'action': 'HOLD', 'ticker': ticker})
@@ -1074,7 +1215,6 @@ Rules:
         }
 
     def check_watch_reminder(self, recommendations):
-        """어제 관망한 추천이 오늘도 유효한지 확인"""
         try:
             with open('watch_state.json', 'r') as f:
                 watch = json.load(f)
@@ -1095,22 +1235,21 @@ Rules:
                 names = ", ".join(f"{t}({self.ticker_names.get(t, t)})" for t in repeated)
                 return f"⏰ 어제 관망한 {names} 오늘도 추천\n"
             return None
-        except:
+        except Exception:
             return None
 
     # --------------------------------------------------------
     # 텔레그램 리포트 생성
+    # --------------------------------------------------------
     def format_telegram_report(self, recommendations, afterhours_summary=None):
         report = f"📊 데일리 브리핑\n🕐 {self.now.strftime('%Y-%m-%d %H:%M EST')}\n"
         report += "=" * 37 + "\n"
 
-        # 관망 재알림
         watch_reminder = self.check_watch_reminder(recommendations)
         if watch_reminder:
             report += watch_reminder
             report += "=" * 37 + "\n"
 
-        # IMP-005: 뉴스 섹션 — 헤드라인 아래 영향자산 들여쓰기
         if afterhours_summary:
             conclusion = afterhours_summary.get('conclusion', '')
             conclusion_emoji = "🟢" if "호재" in conclusion else "🔴" if "악재" in conclusion else "⚪"
@@ -1118,7 +1257,6 @@ Rules:
             bearish_count = afterhours_summary.get('bearish_count', 0)
             report += f"{conclusion_emoji} {conclusion} | 호재 {bullish_count}건 | 악재 {bearish_count}건\n"
 
-            # key_bullish: 헤드라인 + 영향자산 들여쓰기
             for item in afterhours_summary.get('key_bullish', []):
                 if isinstance(item, dict):
                     headline = item.get('headline', '')
@@ -1153,7 +1291,6 @@ Rules:
 
             report += "=" * 37 + "\n"
 
-        # TFSA 1
         tfsa1_actions = recommendations['tfsa1']
         sells = [a for a in tfsa1_actions if a['action'] == 'SELL']
         buys = [a for a in tfsa1_actions if a['action'] == 'BUY']
@@ -1194,7 +1331,6 @@ Rules:
 
         report += "=" * 37 + "\n"
 
-        # TFSA 2
         report += f"💡 TFSA 2 | 💵 현금: $0\n"
         tfsa2_has_action = any(
             any(a['action'] != 'HOLD' for a in data['actions'])
@@ -1239,7 +1375,7 @@ Rules:
         return report
 
     # --------------------------------------------------------
-    # 텔레그램 전송 (버튼 포함)
+    # 텔레그램 전송
     # --------------------------------------------------------
     async def send_telegram(self, message, with_buttons=False, pending_trades=None):
         bot = Bot(token=self.telegram_token)
@@ -1279,18 +1415,21 @@ Rules:
     def run(self):
         try:
             print("\n" + "=" * 50)
-            print("🤖 Daily Digest v4.0 시작")
+            print("🤖 Daily Digest v4.1 시작")
             print("=" * 50)
 
-            afterhours_news = self.load_afterhours_news()
+            # [수정 4] afterhours_collector 삭제 → 직접 수집
+            afterhours_news = self.collect_afterhours_news()
             afterhours_summary = self.analyze_afterhours_summary(afterhours_news) if afterhours_news else None
 
             all_news = self.collect_all_news()
-            if not all_news:
+            if not all_news and not afterhours_news:
                 asyncio.run(self.send_telegram("📭 오늘은 관련 뉴스가 없습니다."))
                 return
 
-            asset_impacts = self.aggregate_asset_impacts(all_news)
+            # 장후 뉴스 + 아침 뉴스 합쳐서 시간 가중치 분석
+            combined_news = afterhours_news + all_news
+            asset_impacts = self.aggregate_asset_impacts(combined_news)
             rankings = self.create_rankings(asset_impacts)
             recommendations = self.generate_recommendations(rankings)
 
@@ -1303,12 +1442,7 @@ Rules:
             }
 
             asyncio.run(self.send_telegram(report, with_buttons=True, pending_trades=pending_trades))
-
-            # 자가학습: 추천 이력 저장
             self.save_recommendation_history(recommendations, rankings)
-
-            if afterhours_news:
-                self.clear_afterhours_news()
 
             print("\n✅ 완료!")
 
@@ -1316,27 +1450,24 @@ Rules:
             error_msg = f"⚠️ Daily Digest 오류\n🕐 {datetime.now(pytz.timezone('America/New_York')).strftime('%Y-%m-%d %H:%M EST')}\n❌ {str(e)}\nGitHub Actions에서 로그를 확인하세요."
             try:
                 asyncio.run(self.send_telegram(error_msg))
-            except:
+            except Exception:
                 pass
             raise
 
 
 def is_market_open():
-    """미국/캐나다 증시 휴장일 체크"""
     est = pytz.timezone('America/New_York')
     now = datetime.now(est)
 
-    # 주말
     if now.weekday() >= 5:
         print(f"📅 주말 ({now.strftime('%A')}) — 스킵")
         return False
 
-    # 미국 주요 휴장일 (2026)
     us_holidays = [
-        '2026-01-01', '2026-01-19', '2026-02-16',  # 신년, MLK, 대통령의날
-        '2026-04-03', '2026-05-25', '2026-06-19',   # 성금요일, 메모리얼, 준틴스
-        '2026-07-03', '2026-09-07', '2026-11-26',   # 독립기념, 노동절, 추수감사
-        '2026-12-25',                                 # 크리스마스
+        '2026-01-01', '2026-01-19', '2026-02-16',
+        '2026-04-03', '2026-05-25', '2026-06-19',
+        '2026-07-03', '2026-09-07', '2026-11-26',
+        '2026-12-25',
     ]
     today_str = now.strftime('%Y-%m-%d')
     if today_str in us_holidays:
@@ -1348,8 +1479,7 @@ def is_market_open():
 
 if __name__ == "__main__":
     if not is_market_open():
-        print("🛑 장 휴무 — afterhours-collector만 실행됩니다.")
+        print("🛑 장 휴무 — 스킵")
     else:
         agent = DailyDigest()
         agent.run()
-
