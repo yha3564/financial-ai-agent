@@ -23,10 +23,10 @@ from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 
 
 class IntradayMonitor:
-    """장중 30분마다 새 뉴스 모니터링 v4.0"""
+    """장중 30분마다 새 뉴스 모니터링 v4.1"""
 
     def __init__(self):
-        print("🔍 Intraday Monitor v4.0 초기화...")
+        print("🔍 Intraday Monitor v4.1 초기화...")
 
         self.news_api_key = os.environ['NEWS_API_KEY']
         self.groq_api_key = os.environ['GROQ_API_KEY']
@@ -66,6 +66,19 @@ class IntradayMonitor:
 
         self.alternative_assets = [a['ticker'] for a in self.config.get('alternative_assets', [])]
         self.safe_assets = [a['ticker'] for a in self.config.get('safe_assets', [])]
+
+        # [수정 3] hot_stocks.yaml 병합
+        try:
+            with open('hot_stocks.yaml', 'r', encoding='utf-8') as f:
+                hot = yaml.safe_load(f) or {}
+            existing = set(self.alternative_assets)
+            for asset in hot.get('assets', []):
+                if asset['ticker'] not in existing:
+                    self.alternative_assets.append(asset['ticker'])
+                    self.mer_map[asset['ticker']] = asset.get('mer', 0)
+            print(f"🔥 핫종목 병합 완료")
+        except FileNotFoundError:
+            pass
 
         self.load_portfolio()
         self.build_ticker_name_map()
@@ -122,20 +135,25 @@ class IntradayMonitor:
                 self.ticker_names[asset['ticker']] = asset.get('name', asset['ticker'])
 
     # --------------------------------------------------------
-    # 가격 배치 로드
+    # [수정 2] 가격 배치 로드 — period="60d", _hist 캐시 추가
     # --------------------------------------------------------
     def _load_prices(self, tickers):
-        print(f"📥 가격 배치 로드 ({len(tickers)}개)...")
+        print(f"📥 가격 배치 로드 ({len(tickers)}개, period=60d)...")
         self._prices = {}
+        self._hist = {}  # [수정 2] 히스토리 캐시 추가
         chunks = [tickers[i:i+20] for i in range(0, len(tickers), 20)]
 
         for i, chunk in enumerate(chunks):
             try:
-                df = yf.download(" ".join(chunk), period="2d", auto_adjust=True, progress=False)
+                # [수정 2] period "2d" → "60d" (TA 계산용)
+                df = yf.download(" ".join(chunk), period="60d",
+                                 auto_adjust=True, progress=False)
                 if len(chunk) == 1:
                     ticker = chunk[0]
                     if 'Close' in df.columns and len(df) > 0:
-                        self._prices[ticker] = float(df['Close'].iloc[-1])
+                        close = df['Close'].dropna()
+                        self._prices[ticker] = float(close.iloc[-1])
+                        self._hist[ticker] = pd.DataFrame({'Close': close})
                     else:
                         self._prices[ticker] = 0
                 else:
@@ -143,8 +161,12 @@ class IntradayMonitor:
                         for ticker in chunk:
                             try:
                                 close = df['Close'][ticker].dropna()
-                                self._prices[ticker] = float(close.iloc[-1]) if len(close) > 0 else 0
-                            except:
+                                if len(close) > 0:
+                                    self._prices[ticker] = float(close.iloc[-1])
+                                    self._hist[ticker] = pd.DataFrame({'Close': close})
+                                else:
+                                    self._prices[ticker] = 0
+                            except Exception:
                                 self._prices[ticker] = 0
                     else:
                         for ticker in chunk:
@@ -156,7 +178,8 @@ class IntradayMonitor:
                 for ticker in chunk:
                     self._prices[ticker] = 0
 
-        print(f"✅ 가격 로드 완료")
+        loaded = sum(1 for v in self._prices.values() if v > 0)
+        print(f"✅ 가격 로드 완료 ({loaded}/{len(tickers)}개)")
 
     def get_price(self, ticker):
         return self._prices.get(ticker, 0)
@@ -176,7 +199,7 @@ class IntradayMonitor:
             if data.get('date') != self.now.strftime('%Y-%m-%d'):
                 return set()
             return set(data.get('seen_ids', []))
-        except:
+        except Exception:
             return set()
 
     def save_seen_news(self, seen_ids):
@@ -263,7 +286,7 @@ class IntradayMonitor:
                         content = ' '.join([p.get_text() for p in soup.find_all('p')[:8]])[:600]
                         news['content'] = content
                         crawl_count += 1
-                except:
+                except Exception:
                     pass
 
         return new_news, seen_ids
@@ -362,7 +385,7 @@ Rules:
                         asset_scores[ticker]['confidences'].append(confidence)
                         asset_scores[ticker]['reasons'].append(reason)
                         asset_scores[ticker]['count'] += 1
-                    except:
+                    except Exception:
                         pass
 
         results = {}
@@ -387,15 +410,15 @@ Rules:
         return results
 
     # --------------------------------------------------------
-    # 기술적 분석
+    # [수정 2] 기술적 분석 — _hist 캐시 사용 (개별 API 호출 제거)
     # --------------------------------------------------------
     def technical_analysis(self, ticker):
         try:
-            stock = yf.Ticker(ticker)
-            df = stock.history(period='30d')
-            if len(df) < 14:
+            df = self._hist.get(ticker, pd.DataFrame())
+            if df.empty or len(df) < 14:
                 return {'signal': 'neutral', 'rsi': 50}
 
+            df = df.copy()
             df['rsi'] = ta.rsi(df['Close'], length=14)
             current_rsi = float(df['rsi'].iloc[-1])
 
@@ -409,7 +432,7 @@ Rules:
                 return {'signal': 'sell', 'rsi': current_rsi}
             else:
                 return {'signal': 'neutral', 'rsi': current_rsi}
-        except:
+        except Exception:
             return {'signal': 'neutral', 'rsi': 50}
 
     # --------------------------------------------------------
@@ -446,9 +469,6 @@ Rules:
 
     # --------------------------------------------------------
     # 추천 생성
-    # IMP-006/007: 모든 매도 후 즉시 대안자산 재투자 (현금 대기 금지)
-    #              예외: 양수 점수 자산이 없을 때만 현금 보유 허용
-    # IMP-002:     각 액션에 recommended_price / recommended_at 저장
     # --------------------------------------------------------
     def generate_recommendations(self, alert_rankings):
         tfsa1_rules = self.trading_rules.get('tfsa1', {})
@@ -457,7 +477,14 @@ Rules:
         recommended_at = self.now.isoformat()
 
         alert_map = {r['ticker']: r for r in alert_rankings}
-        safe_rankings = [r for r in alert_rankings if r['ticker'] in self.safe_assets]
+
+        # [수정 7] TFSA2 보유 자산 제외 → 순환 추천 방지
+        held_tfsa2_tickers = set(self.my_holdings_tfsa2.keys())
+        safe_rankings = [
+            r for r in alert_rankings
+            if r['ticker'] in self.safe_assets
+            and r['ticker'] not in held_tfsa2_tickers
+        ]
         safe_rankings.sort(key=lambda x: x['net_score'], reverse=True)
 
         # ── TFSA 1 ──
@@ -467,7 +494,6 @@ Rules:
         half_threshold = tfsa1_rules.get('half_sell_threshold', 0.25)
         full_threshold = tfsa1_rules.get('full_sell_threshold', 0.35)
 
-        # STEP 1: 매도 판단
         for ticker, holding in self.my_holdings_tfsa1.items():
             if ticker not in alert_map:
                 continue
@@ -483,8 +509,8 @@ Rules:
                     'ticker': ticker, 'shares': shares,
                     'price': price, 'value': value,
                     'score': score, 'expected_pct': score * 100,
-                    'recommended_price': price,      # IMP-002
-                    'recommended_at': recommended_at  # IMP-002
+                    'recommended_price': price,
+                    'recommended_at': recommended_at
                 })
                 available_cash += value
 
@@ -517,7 +543,6 @@ Rules:
 
         sold_tickers = [a['ticker'] for a in tfsa1_actions if a['action'] == 'SELL' and a['type'] == 'full']
 
-        # STEP 2: 매수 후보 (alert_rankings + 전체 자산 중 양수)
         buy_candidates = [
             r for r in alert_rankings
             if r['weighted_score'] > self.alert_threshold
@@ -526,10 +551,8 @@ Rules:
         ]
         buy_candidates.sort(key=lambda x: x['net_score'], reverse=True)
 
-        # IMP-006/007: 양수 후보 존재 여부 확인
         has_positive_candidate = len(buy_candidates) > 0
 
-        # STEP 3: 현금/매도금 있으면 즉시 재투자
         if available_cash > 0 and buy_candidates and has_positive_candidate:
             top1 = buy_candidates[0]
             if len(buy_candidates) >= 2:
@@ -554,7 +577,6 @@ Rules:
                         'recommended_at': recommended_at
                     })
 
-        # STEP 4: 스왑 판단
         has_buy = any(a['action'] == 'BUY' for a in tfsa1_actions)
         if not has_buy and buy_candidates and has_positive_candidate:
             top1 = buy_candidates[0]
@@ -579,7 +601,7 @@ Rules:
                     w_shares = w_holding.get('shares', 0)
                     w_price = self.get_price(w_ticker)
                     w_value = w_shares * w_price
-                    print(f"   🔄 스왑: {w_ticker}(score={weakest['weighted_score']:.3f}) → {top1['ticker']}(score={top1['weighted_score']:.3f})")
+                    print(f"   🔄 스왑: {w_ticker} → {top1['ticker']}")
                     tfsa1_actions.append({
                         'action': 'SELL', 'type': 'full',
                         'ticker': w_ticker, 'shares': w_shares,
@@ -617,7 +639,7 @@ Rules:
             value = shares * price
             actions = []
 
-            best_alt = safe_rankings[0] if safe_rankings and safe_rankings[0]['ticker'] != ticker else None
+            best_alt = safe_rankings[0] if safe_rankings else None
 
             if score <= -full_threshold_t2 and best_alt:
                 best_price = self.get_price(best_alt['ticker'])
@@ -658,20 +680,15 @@ Rules:
 
     # --------------------------------------------------------
     # 알림 메시지 포맷
-    # IMP-005: 뉴스 헤드라인 아래 "   → 영향자산" 들여쓰기
-    # IMP-011: 매수 섹션 "💰 매수가능" + 자산명 + 주수@가격
-    # IMP-013: TFSA 2 항상 표시
     # --------------------------------------------------------
     def format_alert(self, alert_rankings, recommendations, top_news):
         now_str = self.now.strftime('%H:%M EST')
         msg = f"🚨 장중 알림 | {now_str}\n"
         msg += "=" * 37 + "\n"
 
-        # IMP-005: 뉴스 + 영향자산 들여쓰기 구조
         bullish = [r for r in alert_rankings if r['weighted_score'] > 0]
         bearish = [r for r in alert_rankings if r['weighted_score'] < 0]
 
-        # 전반적 방향
         if bullish or bearish:
             if len(bullish) > len(bearish):
                 msg += f"🟢 전반적 호재 | 호재 {len(bullish)}건 | 악재 {len(bearish)}건\n"
@@ -680,11 +697,9 @@ Rules:
             else:
                 msg += f"⚪ 혼재 | 호재 {len(bullish)}건 | 악재 {len(bearish)}건\n"
 
-        # 뉴스 헤드라인 + 영향자산 들여쓰기
         if top_news:
             for news in top_news[:3]:
                 title = news.get('title', '')[:70]
-                # 이 뉴스와 관련된 alert_rankings 자산 찾기
                 title_lower = title.lower()
                 affected = [
                     r for r in alert_rankings
@@ -702,7 +717,6 @@ Rules:
 
         msg += "\n"
 
-        # TFSA 1 추천
         tfsa1_actions = recommendations['tfsa1']
         sells = [a for a in tfsa1_actions if a['action'] == 'SELL']
         buys = [a for a in tfsa1_actions if a['action'] == 'BUY']
@@ -718,14 +732,12 @@ Rules:
                 holding = self.my_holdings_tfsa1.get(s['ticker'], {})
                 total_shares = holding.get('shares', 0)
                 price = self.get_price(s['ticker'])
-                total_value = total_shares * price
                 type_label = "전량" if s['type'] == 'full' else "절반" if s['type'] == 'half' else "부분"
                 pct = int(round((s['shares'] / total_shares * 100) if total_shares > 0 else 0))
                 msg += f"\n📤 {type_label} 매도 ({pct}%)\n{s['ticker']} ({name})\n{s['shares']}주 @${price:.2f} = ${s['value']:.2f}\n"
                 if s['type'] != 'full':
                     msg += f"잔여: {round(total_shares - s['shares'], 4)}주 계속 보유\n"
 
-            # IMP-011: 매수 포맷 통일
             if buys:
                 total_available = self.accumulated_cash + sell_total
                 if sell_total > 0 and self.accumulated_cash > 0:
@@ -739,7 +751,6 @@ Rules:
                     name = self.ticker_names.get(b['ticker'], b['ticker'])
                     msg += f"{b['ticker']} ({name})\n{b['shares']}주 @${b['price']:.2f} = ${b['value']:.2f}  ({b['expected_pct']:+.1f}% 예상)\n"
 
-        # IMP-013: TFSA 2 항상 표시
         msg += "\n💡 TFSA 2\n"
         tfsa2_has_action = any(
             any(a['action'] != 'HOLD' for a in data['actions'])
@@ -862,7 +873,6 @@ Rules:
             }
 
             asyncio.run(self.send_telegram(alert_msg, with_buttons=True, pending_trades=pending_trades))
-
             self.save_seen_news(seen_ids | {n['url'] for n in new_news})
             print("\n✅ 완료!")
 
@@ -870,7 +880,7 @@ Rules:
             error_msg = f"⚠️ Intraday Monitor 오류\n🕐 {self.now.strftime('%H:%M EST')}\n❌ {str(e)}"
             try:
                 asyncio.run(self.send_telegram(error_msg))
-            except:
+            except Exception:
                 pass
             raise
 
@@ -898,5 +908,3 @@ if __name__ == "__main__":
     else:
         monitor = IntradayMonitor()
         monitor.run()
-
-
