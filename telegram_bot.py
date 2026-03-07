@@ -1,16 +1,15 @@
 import os
 import json
-import hmac
-import hashlib
 import asyncio
 import base64
 import requests
+import time
 from datetime import datetime
 import pytz
 from flask import Flask, request, jsonify, render_template_string
-from telegram import Bot
+from telegram import Bot, ForceReply
 
-# Gemini Vision (스크린샷 인식)
+# Gemini Vision
 try:
     from google import genai as genai_new
     USE_NEW_GENAI = True
@@ -18,12 +17,9 @@ except ImportError:
     try:
         import google.generativeai as genai
         USE_NEW_GENAI = False
-    except:
+    except Exception:
         USE_NEW_GENAI = None
 
-# ============================================================
-# Flask 앱 (미니앱 서빙 + 웹훅)
-# ============================================================
 flask_app = Flask(__name__)
 
 TELEGRAM_TOKEN = os.environ['TELEGRAM_BOT_TOKEN']
@@ -31,6 +27,10 @@ TELEGRAM_CHAT_ID = os.environ['TELEGRAM_CHAT_ID']
 GH_TOKEN = os.environ['GH_TOKEN']
 GITHUB_REPO = os.environ.get('GITHUB_REPOSITORY', 'yha3564/financial-ai-agent')
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+
+# [수정 2-1] WEBHOOK_SECRET: Render 환경변수에서 읽기 (토큰 URL 노출 방지)
+WEBHOOK_SECRET = os.environ.get('WEBHOOK_SECRET', '')
+
 RENDER_URL = (
     os.environ.get('RENDER_EXTERNAL_URL') or
     os.environ.get('RENDER_URL') or
@@ -39,44 +39,78 @@ RENDER_URL = (
 
 est = pytz.timezone('America/New_York')
 
-# 유저 상태 (메모리, 재시작 시 초기화)
+# [수정 8] user_state 최소화 — ForceReply 사용으로 대부분 불필요
+# waiting_amount 상태만 메모리 유지 (Render 재시작 시 금액 재입력만 필요)
 user_state = {}
 
+
+# ============================================================
+# GitHub 파일 읽기/쓰기
+# ============================================================
 def read_github_file(filename):
-    """GitHub repo에서 JSON 파일 읽기"""
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{filename}"
     headers = {'Authorization': f'token {GH_TOKEN}', 'Accept': 'application/vnd.github.v3.raw'}
     try:
         resp = requests.get(url, headers=headers, timeout=10)
         if resp.status_code == 200:
             return json.loads(resp.text)
-    except:
+    except Exception:
         pass
     return None
 
-def write_github_file(filename, data, message="Update"):
-    """GitHub repo에 JSON 파일 쓰기"""
+
+def write_github_file(filename, data, message="Update", retries=3):
+    """[수정 3] SHA 충돌 시 재시도 + 오류 반환값 검증"""
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{filename}"
     headers = {'Authorization': f'token {GH_TOKEN}'}
-    
-    # 기존 파일 SHA 가져오기
-    resp = requests.get(url, headers=headers, timeout=10)
-    sha = resp.json().get('sha', '') if resp.status_code == 200 else ''
-    
-    content = base64.b64encode(json.dumps(data, indent=2, ensure_ascii=False).encode()).decode()
-    
-    payload = {'message': message, 'content': content}
-    if sha:
-        payload['sha'] = sha
-    
-    requests.put(url, headers=headers, json=payload, timeout=10)
+
+    for attempt in range(retries):
+        # 최신 SHA 매 시도마다 새로 조회
+        resp = requests.get(url, headers=headers, timeout=10)
+        sha = resp.json().get('sha', '') if resp.status_code == 200 else ''
+
+        content = base64.b64encode(
+            json.dumps(data, indent=2, ensure_ascii=False).encode()
+        ).decode()
+        payload = {'message': message, 'content': content}
+        if sha:
+            payload['sha'] = sha
+
+        result = requests.put(url, headers=headers, json=payload, timeout=10)
+        if result.status_code in (200, 201):
+            return True
+        if result.status_code == 422 and attempt < retries - 1:
+            # SHA 충돌 → 재시도
+            time.sleep(1)
+            continue
+        print(f"❌ GitHub 쓰기 실패 {result.status_code}: {result.text[:200]}")
+        return False
+    return False
+
+
+# ============================================================
+# 콜백 응답 헬퍼 (스피너 제거)
+# ============================================================
+def answer_callback(callback_id, text=""):
+    """[수정 2-2] answerCallbackQuery 실패 시 재시도"""
+    bot_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
+    for _ in range(2):
+        try:
+            resp = requests.post(
+                f"{bot_url}/answerCallbackQuery",
+                json={'callback_query_id': callback_id, 'text': text},
+                timeout=5
+            )
+            if resp.status_code == 200:
+                return
+        except Exception:
+            pass
 
 
 # ============================================================
 # Gemini Vision (스크린샷 인식)
 # ============================================================
 def analyze_screenshot(image_base64):
-    """Gemini Vision으로 체결/배당 스크린샷 분석"""
     if not GEMINI_API_KEY:
         return None
     try:
@@ -112,7 +146,6 @@ JSON으로만 응답하세요 (다른 텍스트 없이):
             return None
 
         text = response.text.strip()
-        # JSON 추출
         if '```' in text:
             text = text.split('```')[1].replace('json', '').strip()
         return json.loads(text)
@@ -121,30 +154,29 @@ JSON으로만 응답하세요 (다른 텍스트 없이):
         return None
 
 
-def send_telegram_msg(chat_id, text, keyboard=None):
+def send_telegram_msg(chat_id, text, keyboard=None, reply_markup=None):
     """텔레그램 메시지 전송 헬퍼"""
     bot_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
     payload = {'chat_id': chat_id, 'text': text}
     if keyboard:
         payload['reply_markup'] = json.dumps(keyboard)
+    elif reply_markup:
+        payload['reply_markup'] = json.dumps(reply_markup)
     requests.post(f"{bot_url}/sendMessage", json=payload)
 
 
 def get_investment_recommendation(cash_amount, dividend_ticker=None):
-    """현금으로 투자 추천 생성"""
     portfolio = read_github_file('current_portfolio.json')
 
-    # TFSA2 배당금 → 본체 자산 추가매수
     if dividend_ticker and portfolio:
         tfsa2 = portfolio.get('tfsa2', {})
         for t, data in tfsa2.items():
             origin = data.get('origin_ticker', '')
-            # 배당 티커가 본체이거나 현재 보유 중인 TFSA2 자산이면
             if dividend_ticker == origin or dividend_ticker == t:
                 import yfinance as yf
                 try:
                     price = float(yf.download(t, period='1d', progress=False)['Close'].iloc[-1])
-                except:
+                except Exception:
                     price = data.get('avg_price', 0)
                 if price > 0:
                     shares = round(cash_amount / price, 4)
@@ -152,7 +184,6 @@ def get_investment_recommendation(cash_amount, dividend_ticker=None):
                             f"{t}\n{shares}주 @${price:.2f} = ${cash_amount:.2f}",
                             'tfsa2', t, shares, price)
 
-    # TFSA1 추천
     pending = read_github_file('pending_trades.json')
     if not pending:
         return (f"💵 현금 ${cash_amount:.2f} 적립\n📊 다음 브리핑에서 추천이 나옵니다.",
@@ -175,12 +206,12 @@ def get_investment_recommendation(cash_amount, dividend_ticker=None):
 
 
 def save_watch_state(recommendations):
-    """관망 상태 저장 (다음날 재알림용)"""
     watch_data = {
         'date': datetime.now(est).strftime('%Y-%m-%d'),
         'recommendations': recommendations
     }
     write_github_file('watch_state.json', watch_data, '👀 관망 상태 저장')
+
 
 # ============================================================
 # 미니앱 HTML
@@ -201,107 +232,50 @@ MINIAPP_HTML = '''<!DOCTYPE html>
       padding: 16px;
       min-height: 100vh;
     }
-    h2 {
-      font-size: 18px;
-      font-weight: 700;
-      margin-bottom: 4px;
-    }
-    .subtitle {
-      font-size: 13px;
-      color: var(--tg-theme-hint-color, #8e8e93);
-      margin-bottom: 20px;
-    }
-    .section {
-      margin-bottom: 24px;
-    }
+    h2 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+    .subtitle { font-size: 13px; color: var(--tg-theme-hint-color, #8e8e93); margin-bottom: 20px; }
+    .section { margin-bottom: 24px; }
     .section-title {
-      font-size: 13px;
-      font-weight: 600;
+      font-size: 13px; font-weight: 600;
       color: var(--tg-theme-hint-color, #8e8e93);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 8px;
-      padding-bottom: 4px;
+      text-transform: uppercase; letter-spacing: 0.5px;
+      margin-bottom: 8px; padding-bottom: 4px;
       border-bottom: 1px solid rgba(255,255,255,0.1);
     }
     .trade-row {
-      display: flex;
-      align-items: center;
+      display: flex; align-items: center;
       justify-content: space-between;
       padding: 10px 0;
       border-bottom: 1px solid rgba(255,255,255,0.05);
     }
     .trade-row:last-child { border-bottom: none; }
     .trade-info { flex: 1; }
-    .trade-ticker {
-      font-size: 15px;
-      font-weight: 600;
-    }
-    .trade-detail {
-      font-size: 12px;
-      color: var(--tg-theme-hint-color, #8e8e93);
-      margin-top: 2px;
-    }
-    .trade-badge {
-      font-size: 11px;
-      font-weight: 600;
-      padding: 3px 8px;
-      border-radius: 10px;
-      margin-right: 10px;
-    }
+    .trade-ticker { font-size: 15px; font-weight: 600; }
+    .trade-detail { font-size: 12px; color: var(--tg-theme-hint-color, #8e8e93); margin-top: 2px; }
+    .trade-badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 10px; margin-right: 10px; }
     .badge-buy { background: rgba(52,199,89,0.2); color: #34c759; }
-    .badge-sell-auto {
-      background: rgba(142,142,147,0.2);
-      color: #8e8e93;
-      font-size: 10px;
-    }
+    .badge-sell-auto { background: rgba(142,142,147,0.2); color: #8e8e93; font-size: 10px; }
     .price-input {
-      width: 110px;
-      padding: 8px 10px;
+      width: 110px; padding: 8px 10px;
       background: var(--tg-theme-secondary-bg-color, #2c2c2e);
       border: 1px solid rgba(255,255,255,0.15);
       border-radius: 8px;
       color: var(--tg-theme-text-color, #ffffff);
-      font-size: 15px;
-      text-align: right;
+      font-size: 15px; text-align: right;
     }
-    .price-input:focus {
-      outline: none;
-      border-color: #0a84ff;
-    }
+    .price-input:focus { outline: none; border-color: #0a84ff; }
     .price-input::placeholder { color: #8e8e93; }
-    .auto-label {
-      font-size: 12px;
-      color: #8e8e93;
-      font-style: italic;
-      width: 110px;
-      text-align: right;
-    }
     .submit-btn {
-      width: 100%;
-      padding: 14px;
-      background: #0a84ff;
-      color: white;
-      border: none;
-      border-radius: 12px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      margin-top: 8px;
+      width: 100%; padding: 14px;
+      background: #0a84ff; color: white;
+      border: none; border-radius: 12px;
+      font-size: 16px; font-weight: 600;
+      cursor: pointer; margin-top: 8px;
     }
     .submit-btn:active { opacity: 0.8; }
     .submit-btn:disabled { background: #8e8e93; cursor: not-allowed; }
-    .error-msg {
-      color: #ff453a;
-      font-size: 13px;
-      margin-top: 8px;
-      display: none;
-    }
-    .success-msg {
-      text-align: center;
-      padding: 40px 20px;
-      display: none;
-    }
+    .error-msg { color: #ff453a; font-size: 13px; margin-top: 8px; display: none; }
+    .success-msg { text-align: center; padding: 40px 20px; display: none; }
     .success-icon { font-size: 48px; margin-bottom: 12px; }
     .success-text { font-size: 18px; font-weight: 600; }
   </style>
@@ -314,27 +288,21 @@ MINIAPP_HTML = '''<!DOCTYPE html>
     <p class="error-msg" id="error-msg">모든 매도/매수 가격과 주수를 입력해주세요.</p>
     <button class="submit-btn" id="submit-btn" onclick="submitTrades()">기록 완료</button>
   </div>
-
   <div class="success-msg" id="success-msg">
     <div class="success-icon">✅</div>
     <div class="success-text">기록 완료!</div>
     <p style="margin-top:8px;color:#8e8e93;font-size:14px">포트폴리오가 업데이트됐어요</p>
   </div>
-
   <script>
     const tg = window.Telegram.WebApp;
-    tg.ready();
-    tg.expand();
-
+    tg.ready(); tg.expand();
     let pendingTrades = null;
 
-    // pending_trades 로드
     async function loadTrades() {
       try {
         const res = await fetch('/api/pending_trades');
         pendingTrades = await res.json();
         renderTrades(pendingTrades);
-
         const ts = new Date(pendingTrades.timestamp);
         document.getElementById('timestamp').textContent =
           ts.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'}) + ' 추천';
@@ -347,55 +315,34 @@ MINIAPP_HTML = '''<!DOCTYPE html>
     function renderTrades(data) {
       const container = document.getElementById('trades-container');
       let html = '';
-
-      // TFSA 1
       const tfsa1_buys = (data.tfsa1 || []).filter(a => a.action === 'BUY');
       const tfsa1_sells = (data.tfsa1 || []).filter(a => a.action === 'SELL');
 
       if (tfsa1_buys.length > 0 || tfsa1_sells.length > 0) {
-        html += '<div class="section">';
-        html += '<div class="section-title">TFSA 1</div>';
-
-        // 매도 (체결가 입력)
+        html += '<div class="section"><div class="section-title">TFSA 1</div>';
         tfsa1_sells.forEach(s => {
           const typeLabel = s.type === 'full' ? '전량매도' : s.type === 'half' ? '절반매도' : '부분매도';
           html += `<div class="trade-row">
-            <div class="trade-info">
-              <div class="trade-ticker">${s.ticker}</div>
-              <div class="trade-detail">${s.shares}주 ${typeLabel}</div>
-            </div>
+            <div class="trade-info"><div class="trade-ticker">${s.ticker}</div>
+            <div class="trade-detail">${s.shares}주 ${typeLabel}</div></div>
             <input class="price-input" type="number" step="0.01"
-              id="sell_price_tfsa1_${s.ticker}"
-              placeholder="$0.00"
-              inputmode="decimal">
-            <span class="trade-badge badge-sell-auto">${typeLabel}</span>
-          </div>`;
+              id="sell_price_tfsa1_${s.ticker}" placeholder="$0.00" inputmode="decimal">
+            <span class="trade-badge badge-sell-auto">${typeLabel}</span></div>`;
         });
-
-        // 매수 (주수 + 가격 입력)
         tfsa1_buys.forEach(b => {
           html += `<div class="trade-row">
-            <div class="trade-info">
-              <div class="trade-ticker">${b.ticker}</div>
-              <div class="trade-detail">매수</div>
-            </div>
+            <div class="trade-info"><div class="trade-ticker">${b.ticker}</div>
+            <div class="trade-detail">매수</div></div>
             <span class="trade-badge badge-buy">매수</span>
             <input class="price-input" type="number" step="0.0001"
-              id="shares_tfsa1_${b.ticker}"
-              placeholder="주수"
-              inputmode="decimal"
+              id="shares_tfsa1_${b.ticker}" placeholder="주수" inputmode="decimal"
               style="width:80px;margin-right:4px">
             <input class="price-input" type="number" step="0.01"
-              id="price_tfsa1_${b.ticker}"
-              placeholder="$0.00"
-              inputmode="decimal">
-          </div>`;
+              id="price_tfsa1_${b.ticker}" placeholder="$0.00" inputmode="decimal"></div>`;
         });
-
         html += '</div>';
       }
 
-      // TFSA 2
       const tfsa2 = data.tfsa2 || {};
       Object.entries(tfsa2).forEach(([ticker, data]) => {
         const purpose = data.purpose || '';
@@ -403,60 +350,37 @@ MINIAPP_HTML = '''<!DOCTYPE html>
                       purpose.includes('mother') ? '어머님 자금' : ticker;
         const sells = (data.actions || []).filter(a => a.action === 'SELL');
         const buys = (data.actions || []).filter(a => a.action === 'BUY');
-
         if (sells.length === 0 && buys.length === 0) return;
-
-        html += `<div class="section">`;
-        html += `<div class="section-title">TFSA 2 | ${label}</div>`;
-
+        html += `<div class="section"><div class="section-title">TFSA 2 | ${label}</div>`;
         sells.forEach(s => {
           html += `<div class="trade-row">
-            <div class="trade-info">
-              <div class="trade-ticker">${s.ticker}</div>
-              <div class="trade-detail">${s.shares}주 전량매도</div>
-            </div>
+            <div class="trade-info"><div class="trade-ticker">${s.ticker}</div>
+            <div class="trade-detail">${s.shares}주 전량매도</div></div>
             <input class="price-input" type="number" step="0.01"
-              id="sell_price_tfsa2_${ticker}_${s.ticker}"
-              placeholder="$0.00"
-              inputmode="decimal">
-            <span class="trade-badge badge-sell-auto">전량매도</span>
-          </div>`;
+              id="sell_price_tfsa2_${ticker}_${s.ticker}" placeholder="$0.00" inputmode="decimal">
+            <span class="trade-badge badge-sell-auto">전량매도</span></div>`;
         });
-
         buys.forEach(b => {
           html += `<div class="trade-row">
-            <div class="trade-info">
-              <div class="trade-ticker">${b.ticker}</div>
-              <div class="trade-detail">매수</div>
-            </div>
+            <div class="trade-info"><div class="trade-ticker">${b.ticker}</div>
+            <div class="trade-detail">매수</div></div>
             <span class="trade-badge badge-buy">매수</span>
             <input class="price-input" type="number" step="0.0001"
-              id="shares_tfsa2_${ticker}_${b.ticker}"
-              placeholder="주수"
-              inputmode="decimal"
+              id="shares_tfsa2_${ticker}_${b.ticker}" placeholder="주수" inputmode="decimal"
               style="width:80px;margin-right:4px">
             <input class="price-input" type="number" step="0.01"
-              id="price_tfsa2_${ticker}_${b.ticker}"
-              placeholder="$0.00"
-              inputmode="decimal">
-          </div>`;
+              id="price_tfsa2_${ticker}_${b.ticker}" placeholder="$0.00" inputmode="decimal"></div>`;
         });
-
         html += '</div>';
       });
-
       container.innerHTML = html || '<p style="color:#8e8e93">입력할 거래가 없어요</p>';
     }
 
     async function submitTrades() {
       if (!pendingTrades) return;
-
-      // 매도 체결가 + 매수 주수/가격 수집
-      const prices = {};
-      const shares = {};
+      const prices = {}, shares = {};
       let allFilled = true;
 
-      // TFSA1 매도 체결가
       const tfsa1_sells = (pendingTrades.tfsa1 || []).filter(a => a.action === 'SELL');
       tfsa1_sells.forEach(s => {
         const val = document.getElementById(`sell_price_tfsa1_${s.ticker}`)?.value;
@@ -464,7 +388,6 @@ MINIAPP_HTML = '''<!DOCTYPE html>
         prices[`sell_tfsa1_${s.ticker}`] = parseFloat(val);
       });
 
-      // TFSA1 매수 주수+가격
       const tfsa1_buys = (pendingTrades.tfsa1 || []).filter(a => a.action === 'BUY');
       tfsa1_buys.forEach(b => {
         const priceVal = document.getElementById(`price_tfsa1_${b.ticker}`)?.value;
@@ -477,17 +400,12 @@ MINIAPP_HTML = '''<!DOCTYPE html>
 
       const tfsa2 = pendingTrades.tfsa2 || {};
       Object.entries(tfsa2).forEach(([ticker, data]) => {
-        // TFSA2 매도 체결가
-        const sells = (data.actions || []).filter(a => a.action === 'SELL');
-        sells.forEach(s => {
+        (data.actions || []).filter(a => a.action === 'SELL').forEach(s => {
           const val = document.getElementById(`sell_price_tfsa2_${ticker}_${s.ticker}`)?.value;
           if (!val || parseFloat(val) <= 0) { allFilled = false; return; }
           prices[`sell_tfsa2_${ticker}_${s.ticker}`] = parseFloat(val);
         });
-
-        // TFSA2 매수 주수+가격
-        const buys = (data.actions || []).filter(a => a.action === 'BUY');
-        buys.forEach(b => {
+        (data.actions || []).filter(a => a.action === 'BUY').forEach(b => {
           const priceVal = document.getElementById(`price_tfsa2_${ticker}_${b.ticker}`)?.value;
           const sharesVal = document.getElementById(`shares_tfsa2_${ticker}_${b.ticker}`)?.value;
           if (!priceVal || parseFloat(priceVal) <= 0) { allFilled = false; return; }
@@ -497,11 +415,7 @@ MINIAPP_HTML = '''<!DOCTYPE html>
         });
       });
 
-      if (!allFilled) {
-        document.getElementById('error-msg').style.display = 'block';
-        return;
-      }
-
+      if (!allFilled) { document.getElementById('error-msg').style.display = 'block'; return; }
       document.getElementById('error-msg').style.display = 'none';
       document.getElementById('submit-btn').disabled = true;
       document.getElementById('submit-btn').textContent = '저장 중...';
@@ -513,7 +427,6 @@ MINIAPP_HTML = '''<!DOCTYPE html>
           body: JSON.stringify({ trades: pendingTrades, prices, shares })
         });
         const result = await res.json();
-
         if (result.success) {
           document.getElementById('main-content').style.display = 'none';
           document.getElementById('success-msg').style.display = 'block';
@@ -529,7 +442,6 @@ MINIAPP_HTML = '''<!DOCTYPE html>
         alert('오류가 발생했어요');
       }
     }
-
     loadTrades();
   </script>
 </body>
@@ -566,7 +478,6 @@ def submit_trades():
         prices = data.get('prices', {})
         actual_shares = data.get('shares', {})
 
-        # 포트폴리오 로드
         portfolio = read_github_file('current_portfolio.json')
         if not portfolio:
             return jsonify({'success': False, 'error': 'portfolio not found'}), 404
@@ -578,7 +489,6 @@ def submit_trades():
         sells = [a for a in tfsa1_actions if a['action'] == 'SELL']
         buys = [a for a in tfsa1_actions if a['action'] == 'BUY']
 
-        # 매도 처리 (체결가 기준)
         sell_total = 0
         sold_history = []
         for sell in sells:
@@ -592,7 +502,6 @@ def submit_trades():
             avg_price = existing.get('avg_price', 0)
             remaining = round(old_shares - sell_shares, 4)
 
-            # 실현 손익 기록
             sold_history.append({
                 'ticker': ticker,
                 'shares': sell_shares,
@@ -611,7 +520,6 @@ def submit_trades():
             else:
                 portfolio['tfsa1'][ticker]['shares'] = remaining
 
-        # 매수 처리 (실제 입력 주수+가격 기준)
         buy_total = 0
         for buy in buys:
             ticker = buy['ticker']
@@ -635,13 +543,12 @@ def submit_trades():
                 'avg_price': round(new_avg, 4)
             }
 
-        # accumulated_cash: 기존현금 + 매도금 - 매수금
         portfolio['accumulated_cash'] = max(0, portfolio.get('accumulated_cash', 0) + sell_total - buy_total)
 
         # ── TFSA 2 처리 ──
         tfsa2_actions = trades.get('tfsa2', {})
-        for holder_ticker, data in tfsa2_actions.items():
-            actions = data.get('actions', [])
+        for holder_ticker, action_data in tfsa2_actions.items():
+            actions = action_data.get('actions', [])
             sell_actions = [a for a in actions if a['action'] == 'SELL']
             buy_actions = [a for a in actions if a['action'] == 'BUY']
             purpose_info = {}
@@ -691,19 +598,16 @@ def submit_trades():
                 portfolio['tfsa2'][ticker] = {
                     'shares': round(old_shares + buy_shares, 4),
                     'avg_price': round(new_avg, 4),
-                    'purpose': purpose_info.get('purpose', data.get('purpose', '')),
+                    'purpose': purpose_info.get('purpose', action_data.get('purpose', '')),
                     'target_amount': purpose_info.get('target_amount', 0),
                     'origin_ticker': holder_ticker if holder_ticker != ticker else ''
                 }
 
-        # 시간 업데이트
         portfolio['date'] = now.strftime('%Y-%m-%d')
         portfolio['time'] = now.strftime('%H:%M')
 
-        # GitHub에 저장
         write_github_file('current_portfolio.json', portfolio, '💼 포트폴리오 업데이트')
 
-        # 오늘 매도 실현손익 저장
         if sold_history:
             existing_sold = read_github_file('today_sold.json') or {}
             if existing_sold.get('date') != now.strftime('%Y-%m-%d'):
@@ -718,11 +622,14 @@ def submit_trades():
 
 
 # ============================================================
-# 웹훅 라우트
+# 웹훅 라우트 — [수정 2-1] WEBHOOK_SECRET 사용
 # ============================================================
+@flask_app.route(f'/webhook/<webhook_secret>', methods=['POST'])
+def webhook(webhook_secret):
+    # WEBHOOK_SECRET 검증
+    if webhook_secret != WEBHOOK_SECRET:
+        return 'Forbidden', 403
 
-@flask_app.route(f'/webhook/{TELEGRAM_TOKEN}', methods=['POST'])
-def webhook():
     data = request.get_json()
     if not data:
         return 'OK'
@@ -730,19 +637,18 @@ def webhook():
     bot_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
     now_str = datetime.now(est).strftime('%H:%M EST')
 
-    # ── 일반 메시지 처리 (텍스트/사진) ──
+    # ── 일반 메시지 처리 ──
     message = data.get('message')
     if message:
         chat_id = message.get('chat', {}).get('id')
         if not chat_id:
             return 'OK'
 
-        # 사진 처리 (스크린샷 인식)
+        # 사진 처리
         if message.get('photo'):
-            photo = message['photo'][-1]  # 최고 해상도
+            photo = message['photo'][-1]
             file_id = photo['file_id']
             try:
-                # 파일 다운로드
                 file_resp = requests.get(f"{bot_url}/getFile", params={'file_id': file_id}).json()
                 file_path = file_resp['result']['file_path']
                 file_url = f"https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/{file_path}"
@@ -759,15 +665,25 @@ def webhook():
 
                     if result['type'] == 'dividend':
                         text = f"💰 배당금 인식:\n{ticker} ${amount:.2f}\n\n맞으면 ✅, 틀리면 ❌"
-                        user_state[str(chat_id)] = {'mode': 'confirm_dividend', 'amount': amount, 'ticker': ticker}
+                        user_state[str(chat_id)] = {
+                            'mode': 'confirm_dividend',
+                            'amount': amount, 'ticker': ticker
+                        }
                     else:
                         action_kr = '매수' if action == 'buy' else '매도'
-                        text = f"📝 체결 인식:\n{ticker} {action_kr} {shares}주 @${price:.2f}\n\n맞으면 ✅, 틀리면 ❌"
+                        text = f"📝 체결 인식:\n{ticker} {action_kr} {shares}주 @${price:.2f}\n\n어느 계좌인가요?"
                         user_state[str(chat_id)] = {
-                            'mode': 'confirm_trade',
+                            'mode': 'confirm_trade_pending',
                             'ticker': ticker, 'action': action,
                             'shares': shares, 'price': price
                         }
+                        # [수정 2-5] 계좌 선택 버튼 추가
+                        keyboard = {'inline_keyboard': [[
+                            {'text': '💼 TFSA 1', 'callback_data': 'screenshot_acct_tfsa1'},
+                            {'text': '💰 TFSA 2', 'callback_data': 'screenshot_acct_tfsa2'}
+                        ]]}
+                        send_telegram_msg(chat_id, text, keyboard)
+                        return 'OK'
 
                     keyboard = {'inline_keyboard': [[
                         {'text': '✅ 맞아', 'callback_data': 'screenshot_confirm'},
@@ -781,13 +697,55 @@ def webhook():
                 send_telegram_msg(chat_id, "⚠️ 사진 처리 실패. 금액을 직접 입력해주세요.")
             return 'OK'
 
-        # 텍스트 메시지 처리
-        text = message.get('text', '').strip()
+        # 텍스트 처리
+        text_input = message.get('text', '').strip()
         state = user_state.get(str(chat_id), {})
 
+        # [수정 8] ForceReply reply_to_message로 배당금 금액 파싱
+        reply_to = message.get('reply_to_message', {})
+        if reply_to:
+            original_text = reply_to.get('text', '')
+            if '배당금을 입력하세요' in original_text:
+                import re
+                match = re.search(r'💰 (\S+) \((\S+)\) 배당금을 입력하세요', original_text)
+                if match:
+                    div_ticker = match.group(1)
+                    account = match.group(2).lower()
+                    try:
+                        amount = float(text_input.replace('$', '').replace(',', ''))
+                        portfolio = read_github_file('current_portfolio.json')
+                        if portfolio:
+                            old_cash = portfolio.get('accumulated_cash', 0)
+                            portfolio['accumulated_cash'] = old_cash + amount
+                            write_github_file('current_portfolio.json', portfolio, '💰 배당금 입금')
+
+                            rec_result = get_investment_recommendation(
+                                portfolio['accumulated_cash'], div_ticker)
+                            rec_text, rec_account, rec_ticker, rec_shares, rec_price = rec_result
+
+                            account_label = 'TFSA 2' if 'tfsa2' in account else 'TFSA 1'
+                            msg = (f"💰 {account_label} | {div_ticker} 배당금 ${amount:.2f} 입금\n"
+                                   f"💵 현금: ${portfolio['accumulated_cash']:.2f}\n\n{rec_text}")
+                            keyboard = {'inline_keyboard': [[
+                                {'text': '✅ 매수', 'callback_data': 'div_buy'},
+                                {'text': '💵 현금 보유', 'callback_data': 'div_cash'}
+                            ]]}
+                            user_state[str(chat_id)] = {
+                                'mode': 'none',
+                                'rec_account': rec_account, 'rec_ticker': rec_ticker,
+                                'rec_shares': rec_shares, 'rec_price': rec_price
+                            }
+                            send_telegram_msg(chat_id, msg, keyboard)
+                        else:
+                            send_telegram_msg(chat_id, "⚠️ 포트폴리오를 읽을 수 없습니다.")
+                    except ValueError:
+                        send_telegram_msg(chat_id, "숫자만 입력해주세요. 예: 55.20")
+                return 'OK'
+
+        # 기존 state 기반 처리 (ForceReply 외 남은 케이스)
         if state.get('mode') == 'waiting_dividend_amount':
             try:
-                amount = float(text.replace('$', '').replace(',', ''))
+                amount = float(text_input.replace('$', '').replace(',', ''))
                 portfolio = read_github_file('current_portfolio.json')
                 if portfolio:
                     old_cash = portfolio.get('accumulated_cash', 0)
@@ -807,7 +765,7 @@ def webhook():
                         {'text': '💵 현금 보유', 'callback_data': 'div_cash'}
                     ]]}
                     user_state[str(chat_id)] = {
-                        'mode': 'none', 'cash': portfolio['accumulated_cash'],
+                        'mode': 'none',
                         'rec_account': rec_account, 'rec_ticker': rec_ticker,
                         'rec_shares': rec_shares, 'rec_price': rec_price
                     }
@@ -832,9 +790,15 @@ def webhook():
     chat_id = cb_message.get('chat', {}).get('id')
     message_id = cb_message.get('message_id')
 
-    requests.post(f"{bot_url}/answerCallbackQuery", json={'callback_query_id': callback_id})
+    # [수정 2-2] answerCallbackQuery 재시도
+    answer_callback(callback_id)
 
     if callback_data == 'trade_complete':
+        # [수정 2-3] RENDER_URL 검증
+        if not RENDER_URL:
+            send_telegram_msg(chat_id,
+                "⚠️ 미니앱 URL 미설정\nRender 대시보드에서 RENDER_EXTERNAL_URL 환경변수를 확인하세요.")
+            return 'OK'
         miniapp_url = f"{RENDER_URL}/miniapp"
         keyboard = {'inline_keyboard': [[{
             'text': '📝 체결가 입력',
@@ -847,21 +811,18 @@ def webhook():
         })
 
     elif callback_data == 'trade_watch':
-        # 관망 상태 저장 (재알림용)
         try:
             pending = read_github_file('pending_trades.json')
             if pending:
                 save_watch_state(pending)
-        except:
+        except Exception:
             pass
         keyboard = {'inline_keyboard': [[{
             'text': f'👀 관망 중 ({now_str})',
             'callback_data': 'noop'
         }]]}
         requests.post(f"{bot_url}/editMessageReplyMarkup", json={
-            'chat_id': chat_id,
-            'message_id': message_id,
-            'reply_markup': keyboard
+            'chat_id': chat_id, 'message_id': message_id, 'reply_markup': keyboard
         })
 
     elif callback_data == 'trade_ignore':
@@ -870,47 +831,66 @@ def webhook():
             'callback_data': 'noop'
         }]]}
         requests.post(f"{bot_url}/editMessageReplyMarkup", json={
-            'chat_id': chat_id,
-            'message_id': message_id,
-            'reply_markup': keyboard
+            'chat_id': chat_id, 'message_id': message_id, 'reply_markup': keyboard
         })
 
     elif callback_data == 'dividend_input':
-        # Step 1: TFSA 선택
-        keyboard = {'inline_keyboard': [
-            [{'text': '💼 TFSA 1', 'callback_data': 'div_select_tfsa1'},
-             {'text': '💰 TFSA 2', 'callback_data': 'div_select_tfsa2'}]
-        ]}
+        keyboard = {'inline_keyboard': [[
+            {'text': '💼 TFSA 1', 'callback_data': 'div_select_tfsa1'},
+            {'text': '💰 TFSA 2', 'callback_data': 'div_select_tfsa2'}
+        ]]}
         send_telegram_msg(chat_id, "💰 배당금 어느 계좌에서 들어왔나요?", keyboard)
 
     elif callback_data in ('div_select_tfsa1', 'div_select_tfsa2'):
-        # Step 2: 종목 선택
         account = 'tfsa1' if callback_data == 'div_select_tfsa1' else 'tfsa2'
         portfolio = read_github_file('current_portfolio.json')
         if portfolio:
             holdings = portfolio.get(account, {})
-            buttons = []
-            for t in holdings:
-                buttons.append([{'text': t, 'callback_data': f'div_ticker_{account}_{t}'}])
+            buttons = [[{'text': t, 'callback_data': f'div_ticker_{account}_{t}'}]
+                       for t in holdings]
             if buttons:
-                keyboard = {'inline_keyboard': buttons}
-                send_telegram_msg(chat_id, "어떤 종목 배당금인가요?", keyboard)
+                send_telegram_msg(chat_id, "어떤 종목 배당금인가요?",
+                                  {'inline_keyboard': buttons})
             else:
                 send_telegram_msg(chat_id, "⚠️ 해당 계좌에 보유 자산이 없습니다.")
         else:
             send_telegram_msg(chat_id, "⚠️ 포트폴리오를 읽을 수 없습니다.")
 
     elif callback_data.startswith('div_ticker_'):
-        # Step 3: 금액 입력 대기
+        # [수정 8] ForceReply로 금액 요청 — user_state 불필요
         parts = callback_data.split('_', 3)  # div_ticker_tfsa1_XEI.TO
         account = parts[2]
         ticker = parts[3]
-        user_state[str(chat_id)] = {
-            'mode': 'waiting_dividend_amount',
-            'dividend_account': account,
-            'dividend_ticker': ticker
-        }
-        send_telegram_msg(chat_id, f"💰 {ticker} 배당금 금액을 입력하세요.\n예: 55.20\n\n또는 스크린샷을 보내주세요.")
+        account_label = 'TFSA2' if account == 'tfsa2' else 'TFSA1'
+        # ForceReply: 원본 메시지에 계좌/티커 포함 → reply_to_message에서 파싱
+        force_reply = {'force_reply': True, 'selective': True}
+        send_telegram_msg(
+            chat_id,
+            f"💰 {ticker} ({account_label}) 배당금을 입력하세요.\n예: 55.20\n\n또는 스크린샷을 보내주세요.",
+            reply_markup=force_reply
+        )
+
+    # [수정 2-5] 스크린샷 계좌 선택
+    elif callback_data in ('screenshot_acct_tfsa1', 'screenshot_acct_tfsa2'):
+        state = user_state.get(str(chat_id), {})
+        account = 'tfsa1' if callback_data == 'screenshot_acct_tfsa1' else 'tfsa2'
+        state['account'] = account
+        state['mode'] = 'confirm_trade'
+        user_state[str(chat_id)] = state
+
+        ticker = state.get('ticker', '?')
+        action = state.get('action', '?')
+        shares = state.get('shares', 0)
+        price = state.get('price', 0)
+        action_kr = '매수' if action == 'buy' else '매도'
+        account_label = 'TFSA 1' if account == 'tfsa1' else 'TFSA 2'
+
+        text = f"📝 {account_label} 체결 확인:\n{ticker} {action_kr} {shares}주 @${price:.2f}\n\n맞으면 ✅"
+        keyboard = {'inline_keyboard': [[
+            {'text': '✅ 맞아', 'callback_data': 'screenshot_confirm'},
+            {'text': '❌ 다시', 'callback_data': 'screenshot_reject'}
+        ]]}
+        send_telegram_msg(chat_id, text, keyboard)
 
     elif callback_data == 'screenshot_confirm':
         state = user_state.get(str(chat_id), {})
@@ -919,8 +899,7 @@ def webhook():
             div_ticker = state.get('ticker')
             portfolio = read_github_file('current_portfolio.json')
             if portfolio:
-                old_cash = portfolio.get('accumulated_cash', 0)
-                portfolio['accumulated_cash'] = old_cash + amount
+                portfolio['accumulated_cash'] = portfolio.get('accumulated_cash', 0) + amount
                 write_github_file('current_portfolio.json', portfolio, '💰 배당금 입금')
                 rec_result = get_investment_recommendation(portfolio['accumulated_cash'], div_ticker)
                 rec_text, rec_account, rec_ticker, rec_shares, rec_price = rec_result
@@ -941,40 +920,50 @@ def webhook():
             action = state.get('action', '')
             shares = state.get('shares', 0)
             price = state.get('price', 0)
+            account = state.get('account', 'tfsa1')  # [수정 2-5] TFSA2 지원
+
             portfolio = read_github_file('current_portfolio.json')
             if portfolio and ticker:
+                target = portfolio.get(account, {})
+
                 if action == 'buy':
-                    tfsa1 = portfolio.get('tfsa1', {})
-                    if ticker in tfsa1:
-                        old = tfsa1[ticker]
-                        total_shares = old.get('shares', 0) + shares
+                    if ticker in target:
+                        old = target[ticker]
+                        total_sh = old.get('shares', 0) + shares
                         total_cost = old.get('shares', 0) * old.get('avg_price', 0) + shares * price
-                        tfsa1[ticker] = {
-                            'shares': round(total_shares, 4),
-                            'avg_price': round(total_cost / total_shares, 2) if total_shares > 0 else price
-                        }
+                        new_avg = total_cost / total_sh if total_sh > 0 else price
+                        target[ticker]['shares'] = round(total_sh, 4)
+                        target[ticker]['avg_price'] = round(new_avg, 2)
                     else:
-                        tfsa1[ticker] = {'shares': shares, 'avg_price': price}
-                    portfolio['tfsa1'] = tfsa1
-                    # 현금 차감
-                    spent = shares * price
-                    portfolio['accumulated_cash'] = max(0, portfolio.get('accumulated_cash', 0) - spent)
+                        base = {'shares': shares, 'avg_price': price}
+                        # TFSA2면 purpose/target_amount 보존
+                        if account == 'tfsa2':
+                            # 혹시 기존에 있던 필드 유지
+                            for k in ['purpose', 'target_amount']:
+                                if k in target.get(ticker, {}):
+                                    base[k] = target[ticker][k]
+                        target[ticker] = base
+                    portfolio[account] = target
+                    if account == 'tfsa1':
+                        portfolio['accumulated_cash'] = max(
+                            0, portfolio.get('accumulated_cash', 0) - shares * price)
 
                 elif action == 'sell':
-                    tfsa1 = portfolio.get('tfsa1', {})
-                    if ticker in tfsa1:
-                        old_shares = tfsa1[ticker].get('shares', 0)
+                    if ticker in target:
+                        old_shares = target[ticker].get('shares', 0)
                         new_shares = round(old_shares - shares, 4)
                         if new_shares <= 0:
-                            del tfsa1[ticker]
+                            del target[ticker]
                         else:
-                            tfsa1[ticker]['shares'] = new_shares
-                    portfolio['tfsa1'] = tfsa1
-                    # 매도금 현금 추가
-                    portfolio['accumulated_cash'] = portfolio.get('accumulated_cash', 0) + shares * price
+                            target[ticker]['shares'] = new_shares
+                    portfolio[account] = target
+                    if account == 'tfsa1':
+                        portfolio['accumulated_cash'] = portfolio.get('accumulated_cash', 0) + shares * price
 
                 write_github_file('current_portfolio.json', portfolio, '📝 체결 반영')
-                send_telegram_msg(chat_id, f"✅ 포트폴리오 업데이트 완료\n{ticker} {action} {shares}주 @${price:.2f}")
+                account_label = 'TFSA 1' if account == 'tfsa1' else 'TFSA 2'
+                send_telegram_msg(chat_id,
+                    f"✅ {account_label} 포트폴리오 업데이트 완료\n{ticker} {action} {shares}주 @${price:.2f}")
 
         user_state.pop(str(chat_id), None)
 
@@ -991,7 +980,6 @@ def webhook():
         state = user_state.get(str(chat_id), {})
         rec_account = state.get('rec_account')
         rec_ticker = state.get('rec_ticker')
-        rec_shares = state.get('rec_shares', 0)
         rec_price = state.get('rec_price', 0)
 
         portfolio = read_github_file('current_portfolio.json')
@@ -1000,36 +988,38 @@ def webhook():
             shares = round(cash / rec_price, 4) if rec_price > 0 else 0
 
             if rec_account == 'tfsa2':
-                # TFSA2 추가매수
                 t2 = portfolio.get('tfsa2', {})
-                if rec_ticker in t2:
-                    old = t2[rec_ticker]
-                    total_shares = old.get('shares', 0) + shares
-                    total_cost = old.get('shares', 0) * old.get('avg_price', 0) + shares * rec_price
-                    t2[rec_ticker]['shares'] = round(total_shares, 4)
-                    t2[rec_ticker]['avg_price'] = round(total_cost / total_shares, 2) if total_shares > 0 else rec_price
-                else:
-                    t2[rec_ticker] = {'shares': shares, 'avg_price': rec_price}
+                existing = t2.get(rec_ticker, {})
+                old_sh = existing.get('shares', 0)
+                old_avg = existing.get('avg_price', 0)
+                total_sh = old_sh + shares
+                total_cost = old_sh * old_avg + shares * rec_price
+                # [수정 2-4] purpose/target_amount 보존
+                t2[rec_ticker] = {
+                    'shares': round(total_sh, 4),
+                    'avg_price': round(total_cost / total_sh, 2) if total_sh > 0 else rec_price,
+                    'purpose': existing.get('purpose', ''),
+                    'target_amount': existing.get('target_amount', 0)
+                }
                 portfolio['tfsa2'] = t2
             else:
-                # TFSA1 매수
                 t1 = portfolio.get('tfsa1', {})
-                if rec_ticker in t1:
-                    old = t1[rec_ticker]
-                    total_shares = old.get('shares', 0) + shares
-                    total_cost = old.get('shares', 0) * old.get('avg_price', 0) + shares * rec_price
-                    t1[rec_ticker] = {
-                        'shares': round(total_shares, 4),
-                        'avg_price': round(total_cost / total_shares, 2) if total_shares > 0 else rec_price
-                    }
-                else:
-                    t1[rec_ticker] = {'shares': shares, 'avg_price': rec_price}
+                existing = t1.get(rec_ticker, {})
+                old_sh = existing.get('shares', 0)
+                old_avg = existing.get('avg_price', 0)
+                total_sh = old_sh + shares
+                total_cost = old_sh * old_avg + shares * rec_price
+                t1[rec_ticker] = {
+                    'shares': round(total_sh, 4),
+                    'avg_price': round(total_cost / total_sh, 2) if total_sh > 0 else rec_price
+                }
                 portfolio['tfsa1'] = t1
 
             portfolio['accumulated_cash'] = 0
             write_github_file('current_portfolio.json', portfolio, '💰 배당금 재투자')
             account_label = 'TFSA2' if rec_account == 'tfsa2' else 'TFSA1'
-            send_telegram_msg(chat_id, f"✅ {account_label} 매수 완료\n{rec_ticker} {shares}주 @${rec_price:.2f}\n💵 현금: $0")
+            send_telegram_msg(chat_id,
+                f"✅ {account_label} 매수 완료\n{rec_ticker} {shares}주 @${rec_price:.2f}\n💵 현금: $0")
         else:
             send_telegram_msg(chat_id, "⚠️ 매수할 수 없습니다.")
         user_state.pop(str(chat_id), None)
@@ -1048,30 +1038,25 @@ def webhook():
 
 
 # ============================================================
-# 웹훅 설정 (Render 배포 시 자동 설정)
+# 웹훅 설정
 # ============================================================
-
 async def setup_webhook():
     if not RENDER_URL or not RENDER_URL.startswith('https://'):
-        print(f"⚠️ 웹훅 설정 건너뜀: RENDER_URL이 유효하지 않음 ({repr(RENDER_URL)})")
-        print("   → Render 대시보드에서 RENDER_EXTERNAL_URL 또는 RENDER_URL 환경변수를 확인하세요")
+        print(f"⚠️ 웹훅 설정 건너뜀: RENDER_URL이 유효하지 않음")
+        return
+
+    if not WEBHOOK_SECRET:
+        print("⚠️ WEBHOOK_SECRET 미설정 — Render 환경변수를 확인하세요")
         return
 
     bot = Bot(token=TELEGRAM_TOKEN)
-    webhook_url = f"{RENDER_URL}/webhook/{TELEGRAM_TOKEN}"
+    # [수정 2-1] WEBHOOK_SECRET 사용
+    webhook_url = f"{RENDER_URL}/webhook/{WEBHOOK_SECRET}"
     await bot.set_webhook(webhook_url)
-    print(f"✅ 웹훅 설정 완료: {RENDER_URL}/webhook/[TOKEN HIDDEN]")
+    print(f"✅ 웹훅 설정 완료: {RENDER_URL}/webhook/[SECRET HIDDEN]")
 
-# ============================================================
-# 메인
-# ============================================================
 
 if __name__ == '__main__':
-    import asyncio
-
-    # 웹훅 설정
     asyncio.run(setup_webhook())
-
     port = int(os.environ.get('PORT', 5000))
     flask_app.run(host='0.0.0.0', port=port)
-
