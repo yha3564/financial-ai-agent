@@ -1,556 +1,574 @@
 {
-  "date": "2026-03-06",
-  "updated": "2026-03-06T09:06:11.061115-05:00",
-  "count": 61,
+  "date": "2026-03-07",
+  "updated": "2026-03-07T06:38:41.460610-05:00",
+  "count": 63,
   "news": [
     {
-      "title": "Tech stocks today: Nvidia stops H200 chip production, Anthropic restarts talks with Pentagon - Yahoo Finance",
-      "description": "Nvidia is shifting H200 chip output, Anthropic is restarting talks with the US military, and Apple is releasing new gadgets for consumers.",
-      "url": "https://finance.yahoo.com/news/live/tech-stocks-today-nvidia-stops-h200-chip-production-anthropic-restarts-talks-with-pentagon-135928945.html",
-      "source": "Yahoo Entertainment",
-      "published": "2026-03-05T13:37:50Z",
-      "content": "Oops, something went wrong Nvidia (NVDA) has reportedly halted production of China-bound H200 chips, the Financial Times reported, as regulatory efforts in Washington and Beijing have restricted imports to the Chinese market. News that Nvidia would shift its TSMC output to focus on the Vera Rubin platform came after CEO Jensen Huang suggested on Wednesday that the artificial intelligence leader's multibillion-dollar investments in AI startups OpenAI (OPAI.PVT) and Anthropic (ANTH.PVT) could be its last for a while, as he anticipates those startups going public. At an industry conference on Wed",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "Berkshire Hathaway begins repurchasing shares, CEO Greg Abel buys $15 million in stock - CNBC",
-      "description": "The 62-year-old executive's purchase came a little more than two months into his tenure running the Omaha, Nebraska-based conglomerate.",
-      "url": "https://www.cnbc.com/2026/03/05/berkshire-hathaway-begins-repurchasing-shares-ceo-greg-abel-buys-15-million-in-stock-.html",
-      "source": "CNBC",
-      "published": "2026-03-05T12:30:59Z",
-      "content": " Berkshire Hathaway said Thursday it has resumed repurchasing its own shares for the first time since 2024 and separately new CEO Greg Abel bought $15 million worth of stock himself, an amount equal to his after-tax annual salary. Abel told CNBC he will continue using his full salary amount to purchase Berkshire shares every year. The Omaha, Nebraska-based conglomerate disclosed in a regulatory filing that it began buying back its Class A and Class B shares on Wednesday. Berkshire's stated policy allows the company to repurchase stock whenever the chief executive — after consultation with the ",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "Iran War Punctures Favored Strategy of ‘Sell America, Buy Asia’ - Bloomberg",
-      "description": "The war in Iran is forcing investors to reevaluate one of their most profitable stock strategies, leading some to conclude that the “Sell America, Buy Asia” trade has reached an inflection point.",
-      "url": "https://www.bloomberg.com/news/articles/2026-03-05/iran-war-punctures-favored-strategy-of-sell-america-buy-asia",
-      "source": "Bloomberg",
-      "published": "2026-03-05T11:54:09Z",
-      "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "This stock-market correction signal just triggered for only the third time in seven years. Here’s the message for investors. - MarketWatch",
-      "description": "Research firm Variant Perception says get ready for weeks of volatility and uncertainty",
-      "url": "https://www.marketwatch.com/story/this-stock-market-correction-signal-just-triggered-for-only-the-third-time-in-seven-years-heres-the-message-for-investors-7142847e",
-      "source": "MarketWatch",
-      "published": "2026-03-05T11:50:00Z",
-      "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "Revolut applies for US banking licence in push to crack American market - Financial Times",
-      "description": "London-based fintech says move influenced by Trump administration’s willingness to permit new players",
-      "url": "https://www.ft.com/content/86e56dad-d528-4477-a166-65607e91dc9f",
-      "source": "Financial Times",
-      "published": "2026-03-05T11:00:06Z",
-      "content": "Then $75 per month. Complete digital access to quality FT journalism on any device. Cancel anytime during your trial. Essential digital access to quality FT journalism on any device. Pay a year upfront and save 20%. Complete digital access to quality FT journalism with expert analysis from industry leaders. Pay a year upfront and save 20%. FT Weekend newspaper delivered Saturday plus complete digital access. Check whether you already have access via your university or organisation. Terms & Conditions apply Discover all the plans currently available in your country Digital access for organisati",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "Eli Lilly launches program to help boost employer coverage of obesity drugs in U.S. - CNBC",
-      "description": "Employers can use Lilly's platform to connect with different third-party program administrators that help manage obesity treatment benefits and costs.",
-      "url": "https://www.cnbc.com/2026/03/05/eli-lilly-launches-program-to-boost-employer-coverage-of-obesity-drugs.html",
-      "source": "CNBC",
-      "published": "2026-03-05T11:00:01Z",
-      "content": " In this article Eli Lilly on Thursday launched a new program designed to help more employers cover obesity drugs in the U.S., targeting a major barrier to access for patients.  Lilly and its chief rival, Novo Nordisk, have moved to slash the cash prices of their popular obesity injections for those who want to pay entirely out of pocket. But employer coverage of obesity drugs remains uneven due to high costs, leaving roughly half of people with commercial insurance unable to start or stay on treatment, Lilly said in a release. List prices for Lilly's weight loss and diabetes treatments, Zepbo",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "Wall Street is betting on tariff refunds after Supreme Court ruling - NPR",
-      "description": "When the Supreme Court struck down many of President Trump's tariffs, it left importers wondering how long they'd have to wait to get their money back. Hedge funds are offering to help out.",
-      "url": "https://www.npr.org/2026/03/05/nx-s1-5736120/tariff-refunds-wall-street-trade",
+      "title": "The Kalshi and Polymarket CEO feud: They hate each other - NPR",
+      "description": "The 20-something billionaires who run Kalshi and Polymarket are battling it out to be the top prediction market company. Observers and former insiders say the feud is just heating up.",
+      "url": "https://www.npr.org/2026/03/06/nx-s1-5735893/iran-war-kalshi-polymarket-feud",
       "source": "NPR",
-      "published": "2026-03-05T10:05:00Z",
-      "content": "By  \n\n      Vito Emanuel\n    \n \n                People walk by the New York Stock Exchange on Wall Street. Trades of tariff refunds have ballooned since the Supreme Court struck down many of President Trump's tariffs.\n                \n                    \n                    Spencer Platt/Getty Images\n                    \n                \nhide caption\n When the Supreme Court struck down a huge portion of President Trump's tariffs last month, it set off a wave of uncertainty about how, when and if the approximately $180 billion importers have paid might be refunded. And Wall Street seized the o",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "published": "2026-03-06T10:00:00Z",
+      "content": "\n\n      Bobby Allyn\n    \n \n                Polymarket's Shayne Coplan (left) and Kalshi's Tarek Mansour are two 20-something billionaires who run the biggest prediction market sites. They have had a long-running rivalry.\n                hide caption\n There's one word Kalshi CEO Tarek Mansour is loath to say: Polymarket. Like a politician swiping his never-to-be-spoken-of challenger on the campaign trail, Mansour will drag the enemy but never name the enemy. Yes, there's an \"unregulated, offshore prediction market,\" which is not like Kalshi. Too many people, Mansour says, confuse Kalshi for tha",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "Tech stocks today: Nvidia CEO Jensen Huang suggests end of OpenAI investments, Apple unveils MacBook Neo - Yahoo Finance",
-      "description": "All eyes are on Nvidia's fourth quarter results, due after the closing bell on Wednesday, as AI concerns continue to grip markets.",
-      "url": "https://finance.yahoo.com/news/live/tech-stocks-today-nvidia-ceo-jensen-huang-suggests-end-of-openai-investments-apple-unveils-macbook-neo-201826536.html",
-      "source": "Yahoo Entertainment",
-      "published": "2026-03-05T09:26:52Z",
-      "content": "Oops, something went wrong Nvidia (NVDA) has reportedly halted production of China-bound H200 chips, the Financial Times reported, as regulatory efforts in Washington and Beijing have restricted imports to the Chinese market. News that Nvidia would shift its TSMC output to focus on the Vera Rubin platform came after CEO Jensen Huang suggested on Wednesday that the artificial intelligence leader's multibillion-dollar investments in AI startups OpenAI (OPAI.PVT) and Anthropic (ANTH.PVT) could be its last for a while, as he anticipates those startups going public. At an industry conference on Wed",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "S&P 500 futures slide after major averages rebound, traders' U.S.-Iran fears ease: Live updates - CNBC",
-      "description": "Stocks rebounded on Wednesday, buoyed by gains in technology and semiconductor giants. Oil prices stabilized after this week's surge.",
-      "url": "https://www.cnbc.com/2026/03/04/stock-market-today-live-updates-iran-war.html",
+      "title": "Dow futures tick higher, but index heads for worst week since October on oil surge: Live updates - CNBC",
+      "description": "The Dow Industrials lost nearly 785 points in Thursday’s sell-off as oil prices leapt. The blue-chip index is on track for its worst week since October.",
+      "url": "https://www.cnbc.com/2026/03/05/stock-market-today-live-updates.html",
       "source": "CNBC",
-      "published": "2026-03-05T09:10:00Z",
-      "content": " Stocks resumed their decline Thursday after a one-day respite as concerns over the Iran war flared up again with U.S. crude topping $80 per barrel. The Dow Jones Industrial Average declined 784.67 points, or 1.61%, to 47,954.74. The S&P 500 fell 0.56% to 6,830.71, while the Nasdaq Composite dipped 0.26% to 22,748.99. The stock sell-off was led by Boeing, Caterpillar and other names that stand to lose the most if the global economy slows. Oil prices jumped, with West Texas Intermediate crude futures surpassing $80 per barrel in the afternoon to hit its highest level since July 2024, after Iran",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "published": "2026-03-06T08:16:00Z",
+      "content": " Stocks fell Friday, adding to their weekly declines, as oil prices spiked and traders reacted to an unexpected drop in new U.S. jobs data. The Dow Jones Industrial Average lost 453.19 points, or 0.95%, to end at 47,501.55. It was down close to 950 points, or almost 2%, at its low of the day. The S&P 500 fell 1.33% and settled at 6,740.02. Nasdaq Composite dropped 1.59% and closed at 22,387.68. The two had shed 1.7% and 1.9%, respectively, at their nadirs. West Texas Intermediate crude oil broke above $90 per barrel and ended the week with a 35% gain — its biggest since oil futures trading beg",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "The Block layoffs are just the beginning - Business Insider",
-      "description": "I talked to one of the laid-off Block employees. He gave me a sobering warning.",
-      "url": "https://www.businessinsider.com/most-secure-job-in-tech-block-layoffs-ai-warning-2026-3",
-      "source": "Business Insider",
-      "published": "2026-03-05T09:09:00Z",
-      "content": "\n                                                Every time Aki publishes a story, you’ll get an alert straight to your inbox!\n                                             Enter your email  \n                                                By clicking “Sign up”, you agree to receive emails from Business Insider. In addition, you accept Insider’s\n                                                Terms of Service and\n                                                Privacy Policy.\n                                               In late 2022, when ChatGPT was first blowing everyone's minds, Kenji didn",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "Bitcoin traders, alert: The rally is nearing a two-year 'make or break' price zone - CoinDesk",
-      "description": "The cryptocurrency traders near key price zone that has marked major turning points over the past two years.",
-      "url": "https://www.coindesk.com/markets/2026/03/05/bitcoin-traders-alert-the-rally-is-nearing-a-two-year-make-or-break-level",
-      "source": "CoinDesk",
-      "published": "2026-03-05T07:50:05Z",
-      "content": "Bitcoin BTC$69,966.28 is surging again and is nearing a key make-or-break level, demanding attention from traders. The cryptocurrency's spot price has jumped a full 10% to trade above $72,000 this week, briefly popping above $73,900 on Wednesday, according to CoinDesk data. This impressive bounce, backed by ETF inflows, has fueled hopes of a renewed bull run, but the rally is now confronting a monumental challenge. Prices are approaching a zone that has historically acted as a pivotal turning point, shaping the market’s direction over the past two years. It is a level where both uptrends and d",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "Nvidia Stock Is Rising Again after a 2% Gain on Wednesday — What’s Driving the Rally? - TipRanks",
-      "description": "Chip giant Nvidia ($NVDA) continued to move higher in after-hours trading on Wednesday after closing 2% higher in the regular session. The stock gained after Iris Energy ($IREN) said it",
-      "url": "https://www.tipranks.com/news/nvidia-stock-is-rising-again-after-a-2-gain-on-wednesday-whats-driving-the-rally",
-      "source": "Tipranks.com",
-      "published": "2026-03-05T01:13:05Z",
+      "title": "Anthropic launches AI job destruction detector - Axios",
+      "description": "The AI giant's new measure shows \"limited evidence\" that AI has affected unemployment so far.",
+      "url": "https://www.axios.com/2026/03/05/anthropic-ai-jobs-claude",
+      "source": "Axios",
+      "published": "2026-03-06T04:02:55Z",
       "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "Musk defends himself against accusations of misconduct prior to Twitter takeover - PBS",
-      "description": "A defiant Elon Musk on Wednesday took the stand in a jury trial to defend himself against accusations that he engaged in a pattern of deceptive behavior that misled investors as he attempted to back out of his $44 billion deal to buy Twitter before he finally…",
-      "url": "https://www.pbs.org/newshour/nation/musk-defends-himself-against-accusations-of-misconduct-prior-to-twitter-takeover",
-      "source": "PBS",
-      "published": "2026-03-05T00:56:03Z",
-      "content": "\n\nBarbara Ortutay, Associated Press\n\n\n                    Barbara Ortutay, Associated Press\n                \n \n\nMichael Liedtke, Associated Press\n\n\n                    Michael Liedtke, Associated Press\n                \n Leave your feedback SAN FRANCISCO (AP) — A defiant Elon Musk on Wednesday took the stand in a jury trial to defend himself against accusations that he engaged in a pattern of deceptive behavior that misled investors as he attempted to back out of his $44 billion deal to buy Twitter before he finally completed the takeover. The civil trial in San Francisco centers on a class-act",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "title": "Beyond Meat drops the ‘Meat’ from its name as it expands to plant-based drinks and snacks - AP News",
+      "description": "Beyond Meat is dropping “meat” from its name as it moves beyond the struggling market for plant-based burgers, sausages and tenders and expands into new categories like protein drinks. The company now known as the Beyond The Plant Protein Co., or simply Beyon…",
+      "url": "https://apnews.com/article/beyond-meat-plantbased-protein-drinks-5cf4bd0e5711c062ae9dca52f8980e4c",
+      "source": "Associated Press",
+      "published": "2026-03-06T03:42:00Z",
+      "content": "Beyond CEO Ethan Brown, the company’s founder, poses for a photo at his Beyond booth as the company is transitioning from Beyond Meat to just Beyond, to introduce a new line of sparkling plant‑protein drinks at the Natural Products Expo West 2026 at the Anaheim Convention Center in Anaheim, Calif., on Thursday, March 5, 2026. (AP Photo/Damian Dovarganes) Beyond CEO Ethan Brown, the company’s founder, poses for a photo at his Beyond booth as the company is transitioning from Beyond Meat to just Beyond, to introduce a new line of sparkling plant‑protein drinks at the Natural Products Expo West 2",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "Bettors wagered $54 million on Khamenei’s death. Now they’re not getting paid. - The Washington Post",
-      "description": "Kalshi, a prediction market site, has sparked outrage after freezing $54 million in bets on the death of Iranian leader Ayatollah Ali Khamenei, citing a rule against profiting from death.",
-      "url": "https://www.washingtonpost.com/technology/2026/03/04/kalshi-khamenei-bet-controversy/",
-      "source": "The Washington Post",
-      "published": "2026-03-04T22:13:40Z",
+      "title": "CNBC Daily Open: Oil surges as Iran war enters seventh day - CNBC",
+      "description": "U.S. crude oil hit as much as $80 per barrel Thursday, as the escalating Iran war enters its seventh day and continues disrupting global fuel supplies.",
+      "url": "https://www.cnbc.com/2026/03/06/cnbc-daily-open-oil-iran-war-us-israel.html",
+      "source": "CNBC",
+      "published": "2026-03-06T01:08:00Z",
+      "content": " In this article \n\n\t\t\t\tTaken from CNBC’s Daily Open, our international markets newsletter — Subscribe today\n Crude oil crossed $80 per barrel Thursday, as the Iran war enters its seventh day and continues disrupting global fuel supplies. Iran's Foreign Minister Abbas Araghchi said Thursday that his country was \"not asking for a ceasefire\" from the U.S. and Israel, while President Donald Trump said that his administration will turn its focus to Cuba after the U.S. military operations in Iran are finished. Besides energy disruption, the turmoil in the Middle East has shattered Dubai's status as ",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "Six Flags selling Great Escape, other amusement parks - Times Union",
+      "description": "The Queensbury location, which got its start as Storytown, is among several amusement parks being sold to EPR Properties.",
+      "url": "https://www.timesunion.com/news/article/six-flags-selling-great-escape-owner-hunter-21956833.php",
+      "source": "Albany Times Union",
+      "published": "2026-03-05T23:54:31Z",
       "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "Broadcom Earnings Beat Estimates as AI Demand Remains Strong - Barron's",
-      "description": "",
-      "url": "https://www.barrons.com/articles/broadcom-avgo-earnings-stock-price-0e2efe3e",
-      "source": "Barron's",
-      "published": "2026-03-04T21:52:00Z",
-      "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "Google’s Chatbot Told Man to Give It an Android Body Before Encouraging Suicide, Lawsuit Alleges - Gizmodo",
-      "description": "Gemini allegedly told the man, \"The true act of mercy is to let Jonathan Gavalas die.\"",
-      "url": "https://gizmodo.com/googles-chatbot-told-man-to-give-it-an-android-body-before-encouraging-suicide-lawsuit-alleges-2000729612",
-      "source": "Gizmodo.com",
-      "published": "2026-03-04T20:30:28Z",
-      "content": "\n                Reading time 3 minutes\n       In the days before 36-year-old Jonathan Gavalas took his own life, he was allegedly directed by Google Gemini to carry out a “mass casualty attack” at a storage facility by the Miami International Airport to retrieve a “vessel” that he was told was inside a delivery truck. That “vessel” was allegedly a humanoid robot that he believed to contain his AI “wife.” When the mission failed, Gemini allegedly escalated the messages it was sending to Gavalas, culminating in setting a countdown clock and walking Gavalas through the process of killing himself",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "Bitcoin Surges to $74,000 After President Trump Throws Support Behind Key Crypto Bill - Investopedia",
-      "description": "The world's largest cryptocurrency has gained about 8% over the last 24 hours, hitting its highest level in a month.",
-      "url": "https://www.investopedia.com/bitcoin-surges-after-president-trump-throws-support-behind-key-crypto-bill-11919161",
-      "source": "Investopedia",
-      "published": "2026-03-04T20:15:47Z",
-      "content": "VCG /Getty Images Get personalized, AI-powered answers built on 27+ years of trusted expertise.  This crypto winter could be cut short.\n  Bitcoin (BTCUSD) rallied over the last 24 hours, pushing prices to as high as $74,000 for the first time since early February—signs of an early thaw that appear to be giving investors hope that a recovery is underway. Altcoins, including ether (ETHUSD) and sol (SOLUSD), also rose, helping drive the overall crypto market back to $2.5 trillion in market capitalization, according to data compiled by Messari.\n  The surge in crypto prices coincided with President",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "Moderna Settles a Covid Vaccine Patent Lawsuit. What It Means for the Stock. - Barron's",
-      "description": "",
-      "url": "https://www.barrons.com/articles/moderna-stock-price-settle-lawsuit-arbutus-00b83378",
-      "source": "Barron's",
-      "published": "2026-03-04T19:35:00Z",
-      "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "How would the Iran crisis play out in a world powered by renewables not fossil fuels? - The Conversation",
-      "description": "This conflict exposes the fragility of the global fossil fuel economy and how renewables create resilience.",
-      "url": "https://theconversation.com/how-would-the-iran-crisis-play-out-in-a-world-powered-by-renewables-not-fossil-fuels-277537",
-      "source": "The Conversation Africa",
-      "published": "2026-03-04T17:30:18Z",
-      "content": "\n      Lecturer in Climate Change, Business and Society, King's College London\n     \n      Lecturer in Security, Development and Leadership in Africa, King's College London\n     \n      Professor of Environment, Society & Climate, King's College London\n     Katie Manning receives funding from UK Research and Innovation (UKRI) for a Maximising Adaptation for Climate Change research project that is looking at the adaptive capacity of Nature-based solutions in the UK. Katie also works as a consultant on the current Defra Research, Development and Evidence Framework. Clement Sefa-Nyarko receives fu",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "Recall: 37 million pounds of fried rice, ramen, and dumpling products may contain glass - KING5.com",
-      "description": "Nearly 37 million pounds of food, including items sold at Trader Joe's and Kroger, has been recalled because they may contain glass.",
-      "url": "https://www.king5.com/article/news/nation-world/fried-rice-ramen-recall-glass-contamination/507-09e0acac-9aa3-40b0-bab8-855f15e4887c",
-      "source": "KING5.com",
-      "published": "2026-03-04T16:28:00Z",
-      "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "US Companies Added 63,000 Jobs in February, ADP Data Show - Bloomberg",
-      "description": "US companies added the most jobs since July last month, adding to evidence of some stabilization in the labor market.",
-      "url": "https://www.bloomberg.com/news/articles/2026-03-04/us-companies-added-63-000-jobs-in-february-adp-data-show",
-      "source": "Bloomberg",
-      "published": "2026-03-04T13:48:08Z",
-      "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "Record Numbers of Workers Are Raiding Their 401(k) Savings - WSJ",
-      "description": "A divergent economy has given people record retirement savings and more need to dig into them",
-      "url": "https://www.wsj.com/personal-finance/retirement/record-numbers-of-workers-are-raiding-their-401-k-savings-bc89d5c3",
-      "source": "The Wall Street Journal",
-      "published": "2026-03-04T13:00:00Z",
-      "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "Just three companies dominated the $189B in VC investments last month - TechCrunch",
-      "description": "Crunchbase data shows a record $189 billion of global venture capital flowed to startups last month, with AI startups nabbing 90% of the capital.",
-      "url": "https://techcrunch.com/2026/03/03/openai-anthropic-waymo-dominated-189-billion-vc-investments-february-crunchbase-report/",
-      "source": "TechCrunch",
-      "published": "2026-03-03T22:38:58Z",
-      "content": "Founder Summit 2026 in Boston: Don’t miss ticket savings of up to $300. Register Now. Save up to $680 on your Disrupt 2026 pass. Ends 11:59 p.m. PT tonight. REGISTER NOW. Posted: AI continues to dominate the venture world, per a new Crunchbase report. A record $189 billion of global venture capital flowed to startups in February, according to the report. AI startups overall raised $171 billion, or 90% of the capital raised last month. It’s a stunning number that feels like only the start.  That record spending was more than three times the global VC spend in January and was dominated by mammot",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "Target Outlines Strategic Plan for a New Chapter of Growth in 2026 and Beyond - Target",
-      "description": "Four clear priorities are guiding strategic choices aimed at delighting guests and driving profitable growth in 2026 and beyond.",
-      "url": "https://corporate.target.com/news-features/article/2026/03/target-growth-strategy-2026",
-      "source": "Target.com",
-      "published": "2026-03-03T21:32:16Z",
-      "content": "We’re putting style, design and value at the center of everything we do. And four clear priorities are guiding strategic choices aimed at delighting guests and driving profitable growth in 2026 and beyond. by setting trends with differentiated, culturally relevant assortments that win in style, design and value. to help teams move faster and create more personalized, joyful experiences for guests. by investing in digital discovery and the in-store experience while strengthening loyalty and engagement. by investing in training and career growth for teams and building on Target’s long-standing c",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "Apple MacBook Neo Capped at 8 GB RAM by A18 Pro InFO-PoP Packaging - TechPowerUp",
-      "description": "Yesterday, Apple announced its newest low-cost MacBook Neo, starting at $599 in the United States, or about $499 for education and students. Some online criticism emerged regarding Apple's decision to offer a laptop with only 8 GB of RAM in 2026, with no opti…",
-      "url": "https://www.techpowerup.com/347063/apple-macbook-neo-capped-at-8-gb-ram-by-a18-pro-info-pop-packaging",
-      "source": "Techpowerup.com",
-      "published": "2026-03-05T09:53:01Z",
-      "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "Everything Apple announced: M5 chips, iPhone 17e, new displays - Mashable",
-      "description": "Apple dropped a ton of new hardware this week. Here's a breakdown.",
-      "url": "https://mashable.com/article/apple-announced-macbook-neo-iphone-17e",
-      "source": "Mashable",
-      "published": "2026-03-04T23:59:14Z",
-      "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "Apple Music to add Transparency Tags to distinguish AI music, says report - TechCrunch",
-      "description": "The label or distributor has to opt in to tagging their music as AI, so it's unclear how effective this intervention will be.",
-      "url": "https://techcrunch.com/2026/03/04/apple-music-to-add-transparency-tags-to-distinguish-ai-music-says-report/",
-      "source": "TechCrunch",
-      "published": "2026-03-04T21:43:58Z",
-      "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "Apple's iOS 26.3.1 Brings Bug Fixes, Studio Display Support - CNET",
-      "description": "The minor update arrives a few weeks after iOS 26.3 and focuses on security patches and stability improvements.",
-      "url": "https://www.cnet.com/tech/services-and-software/apple-releases-ios-26-3-1/",
-      "source": "CNET",
-      "published": "2026-03-04T21:14:00Z",
-      "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "Apple's Two New Studio Display Models Feature Different A19 Chips - MacRumors",
-      "description": "Apple's press release and marketing materials for the new Studio Display and Studio Display XDR models do not mention which chips are inside the...",
-      "url": "https://www.macrumors.com/2026/03/04/new-apple-studio-display-chips/",
-      "source": "MacRumors",
-      "published": "2026-03-04T20:54:19Z",
-      "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "After a rocky six years, Sony cancels future single-player PC game releases - Ars Technica",
-      "description": "Titles like Ghost of Yotei will remain exclusive to Sony's hardware.",
-      "url": "https://arstechnica.com/gaming/2026/03/sony-wont-bring-any-more-single-player-playstation-games-to-pc/",
+      "title": "Workers report watching Ray-Ban Meta-shot footage of people using the bathroom - Ars Technica",
+      "description": "Meta accused of \"concealing the facts\" about smart glass users' privacy.",
+      "url": "https://arstechnica.com/gadgets/2026/03/workers-report-watching-ray-ban-meta-shot-footage-of-people-using-the-bathroom/",
       "source": "Ars Technica",
-      "published": "2026-03-04T19:17:59Z",
-      "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "published": "2026-03-05T23:36:04Z",
+      "content": "Meta’s approach to user privacy is under renewed scrutiny following a Swedish report that employees of a Meta subcontractor have watched footage captured by Ray-Ban Meta smart glasses showing sensitive user content. The workers reportedly work for Kenya-headquartered Sama and provide data annotation for Ray-Ban Metas. The February report, a collaboration from Swedish newspapers Svenska Dagbladet, Göteborgs-Posten, and Kenya-based freelance journalist Naipanoi Lepapa, is, per a machine translation, based on interviews with over 30 employees at various levels of Sama, including several people wh",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "\"We're Not Hiding Anything,\" Crimson Desert Rep Says As Players Demand Console Footage - GameSpot",
-      "description": "There has been a lack of console footage for Crimson Desert.",
-      "url": "https://www.gamespot.com/articles/were-not-hiding-anything-crimson-desert-rep-says-as-players-demand-console-footage/1100-6538561/",
-      "source": "GameSpot",
-      "published": "2026-03-04T16:58:54Z",
-      "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "title": "Block employee says the company dangled a 75% pay raise to get her to stay after layoffs — but she decided to quit - Business Insider",
+      "description": "\"I saw my company discard half of my peers and double my pay,\" the former Block employee wrote. \"That's not an honor. It feels shameful.\"",
+      "url": "https://www.businessinsider.com/block-employee-says-quit-retention-bonus-package-offer-2026-3",
+      "source": "Business Insider",
+      "published": "2026-03-05T23:36:00Z",
+      "content": "Survived the Block layoffs? You might be getting a hefty retention package, including a bonus. Naoko Takeda was a data scientist at Block's Cash App for two years, per LinkedIn. After over 4,000 of her Block colleagues were laid off last week, Takeda wrote on LinkedIn that the company offered her a roughly 75% pay increase as well as a \"retention bonus.\" She quit \"almost immediately,\" she wrote. \"I saw my company discard half of my peers and double my pay,\" Takeda wrote. \"That's not an honor. It feels shameful and dehumanizing.\" Takeda wrote that her overall \"retention package\" represented abo",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "Play a Limited Time Event in Pokémon Pokopia on Nintendo Switch 2 - Pokemon.com",
-      "description": "You can celebrate the release of this cozy new adventure on Nintendo Switch 2 with a special limited-time event and an early-purchase bonus.",
-      "url": "https://www.pokemon.com/us/pokemon-news/play-a-limited-time-event-in-pokemon-pokopia-on-nintendo-switch-2",
+      "title": "US considers tying Nvidia and AMD AI chip exports to foreign investment pledges - Financial Times",
+      "description": "Draft rule would require countries to invest in America in exchange for advanced semiconductors",
+      "url": "https://www.ft.com/content/30d0b1df-ad8c-42eb-852b-dad53acaecfc",
+      "source": "Financial Times",
+      "published": "2026-03-05T22:48:42Z",
+      "content": "Then $75 per month. Complete digital access to quality FT journalism on any device. Cancel anytime during your trial. Essential digital access to quality FT journalism on any device. Pay a year upfront and save 20%. Complete digital access to quality FT journalism with expert analysis from industry leaders. Pay a year upfront and save 20%. FT Weekend newspaper delivered Saturday plus complete digital access. Check whether you already have access via your university or organisation. Terms & Conditions apply Discover all the plans currently available in your country Digital access for organisati",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "Elon Musk defends tweets in lawsuit alleging they caused Twitter stock to fall before acquisition - AP News",
+      "description": "Elon Musk continued to defend his actions in the months leading up to his 2022 purchase of Twitter in court Thursday. He faces a class action lawsuit claiming he misled investors. The civil trial in San Francisco centers on a class-action lawsuit filed just b…",
+      "url": "https://apnews.com/article/elon-musk-twitter-shareholders-court-class-action-a5ce0d4a3e5488545c6adc870e746274",
+      "source": "Associated Press",
+      "published": "2026-03-05T22:46:00Z",
+      "content": "Elon Musk, center, arrives for a Twitter shareholder trial at the U.S. District Court for the Northern District of California, Wednesday, March 4, 2026, in San Francisco. (AP Photo/Godofredo A. Vásquez) Elon Musk, right, arrives for a Twitter shareholder trial at the U.S. District Court for the Northern District of California in San Francisco, on Wednesday, March 4, 2026. (AP Photo/Godofredo A. Vásquez) Attorney Stephen Broome, who represents Elon Musk, arrives for a Twitter shareholder trial at U.S. District Court for the Northern District of California, Wednesday, March 4, 2026, in San Franc",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "Marvell Gets AI Sales Boost In Fiscal Q4. Stock Rises. - Investor's Business Daily",
+      "description": "Chipmaker Marvell narrowly beat analyst estimates for its fiscal Q4 and guided modestly higher for the current period. MRVL stock jumped.",
+      "url": "https://www.investors.com/news/technology/mrvl-stock-marvell-technology-fiscal-q4-2026-earnings/",
+      "source": "Investor's Business Daily",
+      "published": "2026-03-05T21:46:00Z",
+      "content": "BREAKING: Stocks Tumble On Oil's Record Week  Chipmaker Marvell Technology (MRVL) late Thursday narrowly beat analyst estimates for its fiscal fourth quarter and guided modestly higher for the current period. Marvell stock jumped in extended trading. The Santa Clara, Calif.-based company earned an adjusted 80 cents per share on sales of $2.22 billion in the quarter ended Jan. 31. Analysts polled by FactSet had expected earnings of… \n3/05/2026\n\t\t\t\t\tStock Market Today: The Dow Jones index gave up 450 points Friday on surging oil prices. Nvidia is a big...\t\t\t\t \n3/05/2026\n\t\t\t\t\tStock Market Today: ",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "Historic winter storms weigh on Gap, Old Navy performance after 800 temporary store closures - CNBC",
+      "description": "Gap has been on a steady upswing of growth but saw worse than expected results during its holiday quarter after historic winter storms led to store closures.",
+      "url": "https://www.cnbc.com/2026/03/05/gap-gap-q4-2025-earnings.html",
+      "source": "CNBC",
+      "published": "2026-03-05T21:16:38Z",
+      "content": " In this article Historic winter storms and subsequent store closures weighed on Gap's performance during its holiday quarter and contributed to worse-than-expected results at its portfolio of brands, the retailer said Thursday.  Cold weather, snow and ice throughout much of the U.S. in January led to about 800 temporary store closures at the storms' peak, contributing to a miss on comparable sales for Old Navy and mixed companywide results, the retailer said.  \"Old Navy and all the brands were actually trending better heading into that weather disruption,\" said finance chief Katrina O'Connell",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "Kalshi Owes Bettors $54 Million On Ayatollah Khamenei's Death, But Claims It Doesn't Have To Pay - OutKick",
+      "description": "The prediction market reportedly tried justifying not paying its winner by saying the site doesn’t allow transactions \"directly tied to death.\"",
+      "url": "https://www.outkick.com/betting/kalshi-owes-bettors-54-million-ayatollah-khameneis-death-claims-doesnt-have-pay",
+      "source": "Outkick.com",
+      "published": "2026-03-05T21:00:56Z",
+      "content": "Bettors had wagered $54 million that Iran’s Ayatollah Ali Khamenei would be \"out before April 1, 2026.\" But as bettors planned to cash out last Saturday following his death due to a joint US-Israel operation, they learned that Kalshi froze the trade.  The bettors did not receive their payout. According to The Washington Post, the prediction market tried justifying not paying its winner by saying the site doesn’t allow transactions \"directly tied to death.\" The outlet interviewed an anonymous Israeli-American business executive in New York, who the app said won $63,000 on the bet, but wouldn't ",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "Something on Wall Street 'Smells Like' 2008, Says Former Goldman Sachs Chief. Here's What It Is. - Investopedia",
+      "description": "Lloyd Blankfein, who led Goldman Sachs through the 2008 financial crisis, expressed concern in several recent interviews that hidden risks within private credit may put the U.S. on track for another financial crisis.",
+      "url": "https://www.investopedia.com/private-credit-stress-smells-like-2008-says-former-goldman-sachs-chief-blankfein-11920345",
+      "source": "Investopedia",
+      "published": "2026-03-05T20:37:46Z",
+      "content": "Michael Nagle / Bloomberg via Getty Images Get personalized, AI-powered answers built on 27+ years of trusted expertise.  The man who led Goldman Sachs through the 2008 financial crisis is sounding the alarm on private credit, joining a chorus of Wall Street veterans expressing concern at a pivotal time for the industry. \n  “It sort of smells like that kind of a moment again,” said Lloyd Blankfein, referring to the Global Financial Crisis, during an interview with Pablo Salame, co-chief investment officer at Citadel. “I don’t feel the storm, but the horses are starting to whinny in the corral,",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "Agencies clarify the capital treatment of tokenized securities - Federal Reserve Board (.gov)",
+      "description": "The federal bank regulatory agencies today jointly issued answers to frequently asked questions to clarify the capital treatment of tokenized securities.  A se",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/bcreg20260305a.htm",
+      "source": "Federalreserve.gov",
+      "published": "2026-03-05T20:33:55Z",
+      "content": "An official website of the United States Government Official websites use .govA .gov website belongs to an official government organization in the United States. Secure .gov websites use HTTPSA lock (LockLocked padlock icon) or https:// means you've safely connected to the .gov website. Share sensitive information only on official, secure websites. March 05, 2026 For release at 3:30 p.m. EST                     \r\n                \r\n                \n\nShare\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n The federal bank regulatory agencies today jointly issued answers to frequently asked questions to clarify the capit",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "China’s New 5-Year Plan: More AI, Less US - Gizmodo",
+      "description": "Maybe it really is the dawning of the Chinese Century.",
+      "url": "https://gizmodo.com/chinas-new-5-year-plan-more-ai-less-us-2000730114",
+      "source": "Gizmodo.com",
+      "published": "2026-03-05T20:10:27Z",
+      "content": "\n                Reading time 2 minutes\n       For whatever reasonâmaybe it was the 145% tariffs, maybe it was the kidnapping of a foreign leader, or the sudden and undeclared rush to war with IranâChina’s President Xi Jinping doesn’t seem to think relying on America is going to be the best idea for his nation going forward. On Thursday, the nation’s head of state introduced a customary five-year plan at the annual meeting of the National People’s Congress. The next half-decade for China, per the plan, could be best described as pursuing technological leaps and weaning itself off dependenc",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "Trump gets data center companies to pledge to pay for power generation - Ars Technica",
+      "description": "With no enforcement and questionable economics, it may not make a difference.",
+      "url": "https://arstechnica.com/tech-policy/2026/03/leading-ai-datacenter-companies-sign-pledge-to-buy-their-own-power/",
+      "source": "Ars Technica",
+      "published": "2026-03-05T18:41:28Z",
+      "content": "On Wednesday, the Trump administration announced that a large collection of tech companies had signed on to what it’s calling the Ratepayer Protection Pledge. By agreeing, the initial signatories—Amazon, Google, Meta, Microsoft, OpenAI, Oracle, and xAI—are saying they will pay for the new generation and transmission capacities needed for any additional data centers they build. But the agreement has no enforcement mechanism, and it will likely run into issues with hardware supplies. It also ignores basic economics. Other than that, it seems like a great idea. The agreement is quite simple, layi",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "McDonald’s CEO Goes Viral for the ‘Incredibly Alien’ Way He Eats a Burger - TODAY.com",
+      "description": "McDonald’s CEO Chris Kempczinski is being roasted on social media, including by Burger King and Wendy's, for the way he ate a Big Arch burger in a viral video.",
+      "url": "https://www.today.com/food/trends/mcdonalds-ceo-eats-burger-video-rcna261776",
+      "source": "TODAY",
+      "published": "2026-03-05T18:18:52Z",
+      "content": "",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "What the Iran war market turmoil means for those nearing retirement - CNBC",
+      "description": "Market shakiness may not concern long-term investors, but it could be a useful wake-up call for those on the precipice of retirement, experts say.",
+      "url": "https://www.cnbc.com/2026/03/05/iran-war-market-volatility-retirement.html",
+      "source": "CNBC",
+      "published": "2026-03-05T17:00:00Z",
+      "content": "",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "United Airlines says it will boot passengers who refuse to use headphones on planes - NBC News",
+      "description": "Listen up, flyers: United Airlines said it will start removing passengers from flights who refuse to wear headphones while listening to content on their personal devices, and such behavior could lead to a permanent ban",
+      "url": "https://www.nbcnews.com/business/business-news/united-boot-passengers-dont-use-headphones-rcna261908",
+      "source": "NBC News",
+      "published": "2026-03-05T16:33:52Z",
+      "content": "",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "ChatGPT Backlash Reveals New Pitfalls in Aligning With Trump - Bloomberg",
+      "description": "Downloads of rival AI tool Claude soar amid feud with the Pentagon.",
+      "url": "https://www.bloomberg.com/news/articles/2026-03-05/why-are-people-deleting-chatgpt-claude-has-the-answer",
+      "source": "Bloomberg",
+      "published": "2026-03-05T16:22:01Z",
+      "content": "",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "New CEO Buys $15 Million In Stock, Berkshire Restarts Buybacks - Investor's Business Daily",
+      "description": "Berkshire Hathaway resumed its long-standing practice of repurchasing company stock, as Greg Abel replaces Warren Buffett as CEO.",
+      "url": "https://www.investors.com/news/berkshire-hathaway-warren-buffett-greg-abel-stock-repurchase/",
+      "source": "Investor's Business Daily",
+      "published": "2026-03-05T14:25:00Z",
+      "content": "",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "Fast Payout Casinos USA 2026: Top Instant Withdrawal Casinos That Pay Out in Minutes - On Pattison",
+      "description": "Below is a curated list of fast payout casinos in the USA for 2026 that stand out for quick cashouts, strong bonuses, and a seamless gaming experience. Use the quick “best for” highlights to find the right platform and start playing in minutes.",
+      "url": "https://onpattison.com/news/2026/mar/05/fast-payout-casinos-usa-2026-top-instant-withdrawal-casinos-that-pay-out-in-minutes/",
+      "source": "Onpattison.com",
+      "published": "2026-03-05T12:26:32Z",
+      "content": "",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "ETH, SOL, XRP price: Cryptos jump 8% as bitcoin breaks $72,000 - CoinDesk",
+      "description": "Ether surged 7.5%, dogecoin jumped 7.5%, and solana added 5.3% as global equities rebounded and $700 million flowed into U.S. spot bitcoin ETFs since the start of March.",
+      "url": "https://www.coindesk.com/markets/2026/03/05/ether-solana-xrp-surge-8-as-crypto-markets-rally-on-easing-war-fears",
+      "source": "CoinDesk",
+      "published": "2026-03-05T06:30:55Z",
+      "content": "",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "Man believed Google’s AI chatbot was his wife. It told him to kill himself, lawsuit says - Straight Arrow News - SAN",
+      "description": "A wrongful death lawsuit filed against Google accuses the company’s AI chatbot Gemini of driving a man to kill himself.",
+      "url": "https://san.com/cc/man-believed-googles-ai-chatbot-was-his-wife-it-told-him-to-kill-himself-lawsuit-says/",
+      "source": "San.com",
+      "published": "2026-03-04T22:45:00Z",
+      "content": "",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "'That’s Not Winning': Record Numbers of US Workers Are Raiding Their 401(k)s in Trump Economy - Common Dreams",
+      "description": "Record numbers of Americans are dipping into their retirement savings to avoid eviction or pay medical bills, undermining Trump's economic claims.",
+      "url": "https://www.commondreams.org/news/401k-hardship-withdrawals-record",
+      "source": "Common Dreams",
+      "published": "2026-03-04T21:41:53Z",
+      "content": "",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "Mortgage Rates Move Back Down Despite Stronger Data - Mortgage News Daily",
+      "description": "Economic data is one of the few consistent sources of motivation for interest rates in the mortgage world and beyond. In general, stronger data tends to push rates higher and vice versa. But in today's case, that correlation didn't pan out.  The first of toda…",
+      "url": "https://www.mortgagenewsdaily.com/markets/mortgage-rates-03042026",
+      "source": "Mortgage News Daily",
+      "published": "2026-03-04T20:54:44Z",
+      "content": "",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "Nominations Sent to the Senate - The White House (.gov)",
+      "description": "Kevin Warsh, of Florida, to be Chairman of the Board of Governors of the Federal Reserve System for a term of four years. Kevin Warsh, of Florida, to be a",
+      "url": "http://www.whitehouse.gov/presidential-actions/2026/03/nominations-sent-to-the-senate-b376/",
+      "source": "Whitehouse.gov",
+      "published": "2026-03-04T16:06:46Z",
+      "content": "",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "Sakurai reveals that he wrote the lyrics for Kirby Air Riders' main theme song, explains why he kept it under wraps - Nintendo Everything",
+      "description": "Director Masahiro Sakurai reveals that he was behind the lyrics for Kirby Air Riders' main theme song and explains why he kept it a secret.",
+      "url": "https://nintendoeverything.com/kirby-air-riders-main-theme-song-lyrics-masahiro-sakurai/",
+      "source": "Nintendoeverything.com",
+      "published": "2026-03-06T01:25:45Z",
+      "content": "",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "Bungie asks sites to delay Marathon reviews, with release date Steam player count below 100K - Notebookcheck",
+      "description": "Gamers may have to form their own opinions about whether Marathon was worth the wait. Although not mandatory, Bungie has asked websites to postpone reviews, leaving Metacritic blank. Naysayers think the unremarkable Marathon Steam player count reflects a lack…",
+      "url": "https://www.notebookcheck.net/Bungie-asks-sites-to-delay-Marathon-reviews-with-release-date-Steam-player-count-below-100K.1243596.0.html",
+      "source": "Notebookcheck.net",
+      "published": "2026-03-06T00:42:00Z",
+      "content": "",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "50 Job Tweets That Are So Funny, I Literally Choked On My Coffee During A Team Meeting - BuzzFeed",
+      "description": "\"ever since I moved my lectures from 9am to 1pm so many of my students family members have stopped passing away, look at me saving so many lives\"",
+      "url": "https://www.buzzfeed.com/chelseastewart/funny-job-tweets-february-2026",
+      "source": "Buzzfeed",
+      "published": "2026-03-05T21:55:12Z",
+      "content": "",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "Amazon is rolling out a redesigned Fire TV app - TechCrunch",
+      "description": "With the updated Fire TV app, users can browse and discover content directly from their phone, manage their watchlist on the go, and play titles on their TV from the mobile app.",
+      "url": "https://techcrunch.com/2026/03/05/amazon-is-rolling-out-a-redesigned-fire-tv-app/",
+      "source": "TechCrunch",
+      "published": "2026-03-05T20:45:38Z",
+      "content": "",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "Missing From Apple's Announcements: iPad 12 With Apple Intelligence - MacRumors",
+      "description": "In his newsletter over the weekend, Bloomberg's Mark Gurman said Apple was likely to announce at least some but possibly not all of the following...",
+      "url": "https://www.macrumors.com/2026/03/05/ipad-12-with-apple-intelligence/",
+      "source": "MacRumors",
+      "published": "2026-03-05T19:57:43Z",
+      "content": "",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "Assassin's Creed Unity Xbox Footage Revealed For The New Series X|S Upgrade - Pure Xbox",
+      "description": "It's out now on both systems",
+      "url": "https://www.purexbox.com/news/2026/03/assassins-creed-unity-xbox-footage-revealed-for-the-new-series-xs-upgrade",
+      "source": "Pure Xbox",
+      "published": "2026-03-05T17:00:00Z",
+      "content": "",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "Claim the Vapid Firebolt ASP Off-Roader and Much More with GTA+ - Rockstar Games",
+      "description": "Conquer the off-road trails of Southern San Andreas with a flatbed beast that's free to claim for GTA+ Members. And beginning on March 10, dominate in the paint and on the perimeter with access to NBA 2K26 in the GTA+ Games Library for a limited time —...",
+      "url": "https://www.rockstargames.com/newswire/article/o394k121o8oa14/claim-the-vapid-firebolt-asp-off-roader-and-much-more-with-gta",
+      "source": "Rockstargames.com",
+      "published": "2026-03-05T16:09:21Z",
+      "content": "",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "\"We don't want to mislead players\" - Control Resonant devs confirm Jesse Faden won't be playable, there's no parry, and it's definitely not a Soulslike - Eurogamer.net",
+      "description": "Remedy recently shared more details on its upcoming sequel, Control Resonant.",
+      "url": "https://www.eurogamer.net/we-dont-want-to-mislead-players-control-resonant-devs-confirm-jesse-faden-wont-be-playable-theres-no-parry-and-its-definitely-not-a-soulslike",
+      "source": "Eurogamer.net",
+      "published": "2026-03-05T15:39:53Z",
+      "content": "",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "Outfit the Pfister X-Treme in the New Premier Half Camo Livery - Rockstar Games",
+      "description": "They say you can’t improve on perfection, but they say a lot of things that aren’t true. Gild the lily by wrapping the Pfister X-Treme (Super) in the new Premier Half Camo Livery, available from all Vehicle Workshops in GTA Online.",
+      "url": "https://www.rockstargames.com/newswire/article/25241811285o98/outfit-the-pfister-x-treme-in-the-new-premier-half-camo-livery",
+      "source": "Rockstargames.com",
+      "published": "2026-03-05T14:59:21Z",
+      "content": "",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "New app alerts users at risk of being filmed with smart glasses - New York Post",
+      "description": "The app’s developer described smart glasses as an “intolerable intrusion, consent-neglecting, horrible piece of tech.”",
+      "url": "https://nypost.com/2026/03/05/tech/nearby-glasses-app-tracks-smart-glasses-users-in-your-area/",
+      "source": "New York Post",
+      "published": "2026-03-05T14:46:00Z",
+      "content": "",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "Get Ready for Rotation with Pokémon TCG Live’s Study Season Event - Pokemon.com",
+      "description": "Receive cool log-in gifts, assess the new card pool, and play a sample of the new format starting March 5.",
+      "url": "https://www.pokemon.com/us/pokemon-news/get-ready-for-rotation-with-pokemon-tcg-lives-study-season-event",
       "source": "Pokemon.com",
-      "published": "2026-03-04T15:19:49Z",
+      "published": "2026-03-05T14:15:21Z",
       "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "Resident Evil Requiem Has Already Sold Over 5 Million Copies - Nintendo Life",
-      "description": "Performing with Grace",
-      "url": "https://www.nintendolife.com/news/2026/03/resident-evil-requiem-has-already-sold-over-5-million-copies",
-      "source": "Nintendo Life",
-      "published": "2026-03-04T12:00:00Z",
+      "title": "Copilot swallows your browser. You're welcome - theregister.com",
+      "description": ": Embeds Edge into AI assistant, ignores questions about opt-in",
+      "url": "https://www.theregister.com/2026/03/05/microsoft_adds_a_sidepane_for/",
+      "source": "Theregister.com",
+      "published": "2026-03-05T13:26:00Z",
       "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "I paired Gemini with NotebookLM and my research reports are now twice as good - MakeUseOf",
-      "description": "A note-taking tool and an AI chatbot are a powerful pairing for research.",
-      "url": "https://www.makeuseof.com/gemini-notebooklm-research-reports/",
-      "source": "MakeUseOf",
-      "published": "2026-03-03T23:00:17Z",
+      "title": "\"In a sense, we're kind of victims of ourselves\" says Crimson Desert's chief marketer, who reckons it plunged over the announcement Kliff too early - Rock Paper Shotgun",
+      "description": "Crimson Desert's chief marketer reckons it being announced too early has made it tougher for folks to grasp what exactly the game's all about.",
+      "url": "https://www.rockpapershotgun.com/in-a-sense-were-kind-of-victims-of-ourselves-says-crimson-deserts-chief-marketer-who-reckons-it-plunged-over-the-announcement-kliff-too-early",
+      "source": "Rock Paper Shotgun",
+      "published": "2026-03-05T12:24:55Z",
       "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "Why Wix Stock Popped Today",
+      "title": "Resident Evil Requiem almost hits Street Fighter 6's total sales in days, a reminder that fighting games are still a drop in the bucket - EventHubs",
+      "description": "Inside a video game industry where many large publishers are struggling, Capcom is not falling into the same slump, but is instead trucking forward with hit after hit.Resident Evil Requiem launched last week to nearly-universal critical and fan praise ...",
+      "url": "https://www.eventhubs.com/news/2026/mar/04/resident-evil-street-fighter-sales/",
+      "source": "EventHubs",
+      "published": "2026-03-05T03:10:37Z",
+      "content": "",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
+    },
+    {
+      "title": "Roth Capital Remains Bullish on ACM Research, Inc. (ACMR) – Here’s Why",
       "description": "",
-      "url": "https://finance.yahoo.com/news/why-wix-stock-popped-today-015826128.html",
+      "url": "https://finance.yahoo.com/news/roth-capital-remains-bullish-acm-100946847.html",
       "source": "Yahoo Finance",
-      "published": "2026-03-05T01:58:26Z",
+      "published": "2026-03-06T10:09:46Z",
       "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "War with Iran chokes flows of oil and natural gas, highlighting energy security risks for Asia",
+      "title": "William Blair Upgrades Aehr Test Systems, Inc. (AEHR) to Outperform from Market Perform – Here’s Why",
       "description": "",
-      "url": "https://finance.yahoo.com/news/war-iran-chokes-flows-oil-030740631.html",
+      "url": "https://finance.yahoo.com/news/william-blair-upgrades-aehr-test-100941784.html",
       "source": "Yahoo Finance",
-      "published": "2026-03-05T03:07:40Z",
+      "published": "2026-03-06T10:09:41Z",
       "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "AI Will Eliminate Wealth Management Jobs. That May Be a Good Thing",
+      "title": "Here’s What Analysts Think About Nova Ltd. (NVMI) Post Earnings",
       "description": "",
-      "url": "https://finance.yahoo.com/news/ai-eliminate-wealth-management-jobs-050100648.html",
+      "url": "https://finance.yahoo.com/news/analysts-think-nova-ltd-nvmi-100943231.html",
       "source": "Yahoo Finance",
-      "published": "2026-03-05T05:01:00Z",
+      "published": "2026-03-06T10:09:43Z",
       "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "Crypto Bounces Back, Spurring Hopes Coin Has Found Stable Price Floor",
+      "title": "Here’s What Wall Street Thinks About Amkor Technology, Inc. (AMKR)",
       "description": "",
-      "url": "https://finance.yahoo.com/news/crypto-bounces-back-spurring-hopes-050100724.html",
+      "url": "https://finance.yahoo.com/news/wall-street-thinks-amkor-technology-100952588.html",
       "source": "Yahoo Finance",
-      "published": "2026-03-05T05:01:00Z",
+      "published": "2026-03-06T10:09:52Z",
       "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "China’s Traditional Businesses Try to Buy Into AI Boom",
+      "title": "Gold on Course for First Weekly Decline in Five Weeks",
       "description": "",
-      "url": "https://www.wsj.com/tech/chinas-traditional-businesses-try-to-buy-into-ai-boom-b3aabb13?siteid=yhoof2&yptr=yahoo",
+      "url": "https://www.barrons.com/livecoverage/stock-market-news-today-030626/card/gold-on-course-for-first-weekly-decline-in-five-weeks-sXbc3EnQqBPSMwpenYsU?siteid=yhoof2&yptr=yahoo",
       "source": "Yahoo Finance",
-      "published": "2026-03-05T02:10:00Z",
+      "published": "2026-03-06T10:08:25Z",
       "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "I'm 64 With $1.2 Million in a 401(k) and $2,800 Monthly Social Security. How Much Can I Spend in Retirement?",
+      "title": "Veeco Instruments Inc. (VECO) Announces Placement of Orders for Multiple Lumina Metal Organic Chemical Vapor Deposition Systems and Spector Ion Beam Sputtering Optical Coating Systems",
       "description": "",
-      "url": "https://finance.yahoo.com/news/im-64-1-2-million-134301202.html",
+      "url": "https://finance.yahoo.com/news/veeco-instruments-inc-veco-announces-101000295.html",
       "source": "Yahoo Finance",
-      "published": "2026-03-05T05:00:00Z",
+      "published": "2026-03-06T10:10:00Z",
       "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "Why FINRA Might Overhaul Its Arbitration System",
+      "title": "Why is Ultra Clean Holdings, Inc. (UCTT) One of the Best Semiconductor Stocks to Invest In Now?",
       "description": "",
-      "url": "https://finance.yahoo.com/news/why-finra-might-overhaul-arbitration-050200461.html",
+      "url": "https://finance.yahoo.com/news/why-ultra-clean-holdings-inc-100959182.html",
       "source": "Yahoo Finance",
-      "published": "2026-03-05T05:02:00Z",
+      "published": "2026-03-06T10:09:59Z",
       "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "Korea’s KOSPI Surges 11% in Historic Rebound, Outpacing Crypto",
+      "title": "Marvell projects strong fiscal 2028 revenue on AI-driven data center boom, shares jump",
       "description": "",
-      "url": "https://finance.yahoo.com/news/korea-kospi-surges-11-historic-021910296.html",
+      "url": "https://finance.yahoo.com/news/marvell-forecasts-first-quarter-revenue-210820027.html",
       "source": "Yahoo Finance",
-      "published": "2026-03-05T02:19:10Z",
+      "published": "2026-03-05T21:08:20Z",
       "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "Copart Stock: Is CPRT Underperforming the Industrial Sector?",
+      "title": "Why Trump Wants Magnets More Than Gold",
       "description": "",
-      "url": "https://finance.yahoo.com/news/copart-stock-cprt-underperforming-industrial-064426214.html",
+      "url": "https://finance.yahoo.com/news/why-trump-wants-magnets-more-100000527.html",
       "source": "Yahoo Finance",
-      "published": "2026-03-05T06:44:26Z",
+      "published": "2026-03-06T10:00:00Z",
       "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "China Halts Fuel Exports Amid Global Market Squeeze",
+      "title": "China to deepen reform of Shenzhen's ChiNext board, regulator says",
       "description": "",
-      "url": "https://finance.yahoo.com/news/china-halts-fuel-exports-amid-064909881.html",
+      "url": "https://finance.yahoo.com/news/china-deepen-reform-shenzhens-chinext-103154946.html",
       "source": "Yahoo Finance",
-      "published": "2026-03-05T06:49:09Z",
+      "published": "2026-03-06T10:31:54Z",
       "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "NBKC Bank review (2026): Simplify your financial life with convenient, fee-free online banking",
+      "title": "Is Ross Stores Stock Outperforming the Dow?",
       "description": "",
-      "url": "https://finance.yahoo.com/personal-finance/banking/review/nbkc-bank-review-214617346.html",
+      "url": "https://finance.yahoo.com/news/ross-stores-stock-outperforming-dow-103537146.html",
       "source": "Yahoo Finance",
-      "published": "2024-02-28T21:46:17Z",
+      "published": "2026-03-06T10:35:37Z",
       "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "Ask an Advisor: Should We Move Our Retirement Assets Into a Target Date Fund or an Annuity?",
+      "title": "Best money market account rates today, March 6, 2026 (up to 4.01% APY return)",
       "description": "",
-      "url": "https://finance.yahoo.com/news/ask-advisor-1-6m-401-120000377.html",
+      "url": "https://finance.yahoo.com/personal-finance/banking/article/best-money-market-account-rates-today-friday-march-6-2026-110011557.html",
       "source": "Yahoo Finance",
-      "published": "2026-03-05T07:00:00Z",
+      "published": "2026-03-06T11:00:11Z",
       "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "The Best Stocks to Invest $1,000 in Right Now",
-      "description": "",
-      "url": "https://finance.yahoo.com/news/best-stocks-invest-1-000-022000919.html",
-      "source": "Yahoo Finance",
-      "published": "2026-03-05T02:20:00Z",
-      "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "The ‘everybody loses’ scenario: Why the Iran conflict is breaking this classic portfolio strategy",
-      "description": "Shifting correlations are a problem for investors. says Morgan Stanley.",
-      "url": "https://www.marketwatch.com/story/the-everybody-loses-scenario-why-the-iran-conflict-is-breaking-this-classic-portfolio-strategy-b47c298d?mod=mw_rss_topstories",
+      "title": "Four companies, including AI and data-center plays, are joining the S&P 500 index",
+      "description": "Vertiv, Lumentum, Coherent and EchoStar are the newest entrants to the S&amp;P 500.",
+      "url": "https://www.marketwatch.com/story/s-p-500-changes-are-due-out-soon-these-ai-stocks-could-join-the-index-ded9e245?mod=mw_rss_topstories",
       "source": "MarketWatch",
-      "published": "Fri, 06 Mar 2026 13:38:00 GMT",
-      "content": "Shifting correlations are a problem for investors. says Morgan Stanley.",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "published": "Fri, 06 Mar 2026 23:01:00 GMT",
+      "content": "Vertiv, Lumentum, Coherent and EchoStar are the newest entrants to the S&P 500.",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "‘I don’t earn enough to support us and our baby’: My unemployed husband lost $22,000 trading sports cards. What now?",
-      "description": "“I intervened, shut the business down and got him into therapy and support for gambling-type behaviors.”",
-      "url": "https://www.marketwatch.com/story/i-dont-earn-enough-to-support-us-and-our-baby-my-husband-is-unemployed-and-lost-22-000-trading-sports-cards-what-now-200c1438?mod=mw_rss_topstories",
+      "title": "These stocks in the S&P 500 have dropped the most since the U.S. and Israel attacked Iran",
+      "description": "A disappointing Friday employment report helped send stocks down further, with cruise operators hammered",
+      "url": "https://www.marketwatch.com/story/these-stocks-in-the-s-p-500-have-dropped-the-most-since-the-u-s-and-israel-attacked-iran-ee7d67da?mod=mw_rss_topstories",
       "source": "MarketWatch",
-      "published": "Fri, 06 Mar 2026 13:04:00 GMT",
-      "content": "“I intervened, shut the business down and got him into therapy and support for gambling-type behaviors.”",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "published": "Fri, 06 Mar 2026 22:16:00 GMT",
+      "content": "A disappointing Friday employment report helped send stocks down further, with cruise operators hammered",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "The 4% rule is done — 5 signs your $1 million retirement portfolio can survive the new withdrawal reality",
-      "description": "Here’s what financial planners know but many retirees discover too late.",
-      "url": "https://www.marketwatch.com/story/the-4-rule-is-done-5-signs-your-1-million-retirement-portfolio-can-survive-the-new-withdrawal-reality-490c029a?mod=mw_rss_topstories",
+      "title": "Defense-tech stocks are the hot trade as Iran conflict widens",
+      "description": "In a week when conflict in Iran sent the U.S. equity market into a tailspin, technology stocks tied to cybersecurity and artificial intelligence have proved more resilient than sectors investors have ",
+      "url": "https://www.marketwatch.com/story/defense-tech-stocks-are-the-hot-trade-as-iran-conflict-widens-c8a5951c?mod=mw_rss_topstories",
       "source": "MarketWatch",
-      "published": "Fri, 06 Mar 2026 12:59:00 GMT",
-      "content": "Here’s what financial planners know but many retirees discover too late.",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "published": "Fri, 06 Mar 2026 22:04:00 GMT",
+      "content": "In a week when conflict in Iran sent the U.S. equity market into a tailspin, technology stocks tied to cybersecurity and artificial intelligence have proved more resilient than sectors investors have typically treated as safe havens.",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "Tax season can be poison for couples. Here’s how to keep the peace.",
-      "description": "Blended families, income inequality and investing blunders are in the spotlight at tax time.",
-      "url": "https://www.marketwatch.com/story/tax-season-can-be-poison-for-couples-heres-how-to-keep-the-peace-8c897584?mod=mw_rss_topstories",
+      "title": "Oil surge sparks Treasury market’s worst weekly rout since ‘liberation day’ chaos",
+      "description": "Government bonds globally were hit hard by surging oil prices as the Iran conflict extends into the weekend",
+      "url": "https://www.marketwatch.com/story/oil-surge-sparks-treasury-markets-worst-weekly-rout-since-liberation-day-chaos-e4e34ad0?mod=mw_rss_topstories",
       "source": "MarketWatch",
-      "published": "Fri, 06 Mar 2026 12:58:00 GMT",
-      "content": "Blended families, income inequality and investing blunders are in the spotlight at tax time.",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "published": "Fri, 06 Mar 2026 21:53:00 GMT",
+      "content": "Government bonds globally were hit hard by surging oil prices as the Iran conflict extends into the weekend",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "Will the bank get suspicious if I deposit $150,000 in cash into my checking account?",
-      "description": "“I live in a state with no inheritance tax. I assume I can make this deposit legally.”",
-      "url": "https://www.marketwatch.com/story/i-live-in-a-state-with-no-inheritance-tax-is-it-legal-to-deposit-150k-cash-into-my-bank-account-d7987cfe?mod=mw_rss_topstories",
+      "title": "Defense companies agree to ramp up output after meeting with Trump",
+      "description": "The meeting came shortly after a Trump social-media post appearing to rule out talks with Iran as the conflict drags down stocks and as oil prices shoot up.",
+      "url": "https://www.marketwatch.com/story/defense-companies-are-meeting-trump-today-heres-what-hell-ask-for-after-demanding-irans-surrender-c84d34d3?mod=mw_rss_topstories",
       "source": "MarketWatch",
-      "published": "Fri, 06 Mar 2026 12:55:00 GMT",
-      "content": "“I live in a state with no inheritance tax. I assume I can make this deposit legally.”",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "published": "Fri, 06 Mar 2026 21:47:00 GMT",
+      "content": "The meeting came shortly after a Trump social-media post appearing to rule out talks with Iran as the conflict drags down stocks and as oil prices shoot up.",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "The cost of healthcare in retirement keeps getting scarier",
-      "description": "These healthcare estimates don’t even include everything you might need.",
-      "url": "https://www.marketwatch.com/story/the-scary-numbers-on-retirement-healthcare-youll-need-up-to-469-000-saved-ae5d4f96?mod=mw_rss_topstories",
+      "title": "‘I have a legal and a moral question’: My dad left when I was 9, reconnected with me in my 50s and now needs money. What do I owe him?",
+      "description": "“After the divorce was finalized, he and his partner moved out of state to a place where there would be no child-support enforcement.”",
+      "url": "https://www.marketwatch.com/story/i-have-a-legal-and-a-moral-question-my-dad-left-when-i-was-9-reconnected-with-me-in-my-50s-and-now-needs-money-what-do-i-owe-him-ca780520?mod=mw_rss_topstories",
       "source": "MarketWatch",
-      "published": "Fri, 06 Mar 2026 12:54:00 GMT",
-      "content": "These healthcare estimates don’t even include everything you might need.",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "published": "Fri, 06 Mar 2026 21:21:00 GMT",
+      "content": "“After the divorce was finalized, he and his partner moved out of state to a place where there would be no child-support enforcement.”",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "Gap’s Athleta brand sales continue to fall, and that’s sinking the retailer’s stock",
-      "description": "The smallest of Gap’s brands continues to be a flash point for investors.",
-      "url": "https://www.marketwatch.com/story/this-gap-brand-continues-to-be-an-underperformer-and-it-is-dragging-the-retailers-stock-579397c9?mod=mw_rss_topstories",
+      "title": "Oil prices are surging. Will that help Tesla and others sell more EVs?",
+      "description": "A 9% jump in gasoline prices in a week could make electric vehicles look more affordable to consumers.",
+      "url": "https://www.marketwatch.com/story/oil-prices-are-surging-will-that-help-tesla-and-others-sell-more-evs-1f2f3856?mod=mw_rss_topstories",
       "source": "MarketWatch",
-      "published": "Fri, 06 Mar 2026 12:32:00 GMT",
-      "content": "The smallest of Gap’s brands continues to be a flash point for investors.",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "published": "Fri, 06 Mar 2026 21:09:00 GMT",
+      "content": "A 9% jump in gasoline prices in a week could make electric vehicles look more affordable to consumers.",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "Anthropic’s meteoric rise shocked the market — but the AI crown remains up for grabs",
-      "description": "Anthropic is fast catching up to OpenAI as the king if AI, but it’s too soon the say it will take, and then hold, the crown.",
-      "url": "https://www.marketwatch.com/story/anthropics-meteoric-rise-shocked-the-market-but-the-ai-crown-remains-up-for-grabs-999f8fef?mod=mw_rss_topstories",
+      "title": "Crude-oil futures haven’t been this overbought since 1990. That doesn’t mean the rally is over.",
+      "description": "A momentum indicator for a crude futures chart has soared to its highest level in 36 years, but as the Wall Street saying goes, overbought doesn’t mean over.",
+      "url": "https://www.marketwatch.com/story/crude-oil-futures-havent-been-this-overbought-since-1990-that-doesnt-mean-the-rally-is-over-1550e567?mod=mw_rss_topstories",
       "source": "MarketWatch",
-      "published": "Fri, 06 Mar 2026 12:01:00 GMT",
-      "content": "Anthropic is fast catching up to OpenAI as the king if AI, but it’s too soon the say it will take, and then hold, the crown.",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "published": "Fri, 06 Mar 2026 20:45:00 GMT",
+      "content": "A momentum indicator for a crude futures chart has soared to its highest level in 36 years, but as the Wall Street saying goes, overbought doesn’t mean over.",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     },
     {
-      "title": "Elon Musk in a post on X says some of his Trump posts ‘went too far’ and that he regrets them",
-      "description": "",
-      "url": "https://www.marketwatch.com/story/elon-musk-in-a-post-on-x-says-some-of-his-trump-posts-went-too-far-and-that-he-regrets-them-90e73a6a?mod=mw_rss_realtimeheadlines",
-      "source": "MarketWatch Real-time",
-      "published": "Wed, 11 Jun 2025 07:09:00 GMT",
-      "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "Bank of England decision on Thursday will be at 12:02 p.m. local time instead of 12 p.m., due to VE Day’s two minutes of silence",
-      "description": "",
-      "url": "https://www.marketwatch.com/story/bank-of-england-decision-on-thursday-will-be-at-12-02-p-m-local-time-instead-of-12-p-m-due-to-ve-day-two-minutes-of-silence-1f6bed66?mod=mw_rss_realtimeheadlines",
-      "source": "MarketWatch Real-time",
-      "published": "Tue, 06 May 2025 11:59:00 GMT",
-      "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "Swiss National Bank cuts interest rates by a half point to 0.5%",
-      "description": "",
-      "url": "https://www.marketwatch.com/story/swiss-national-bank-cuts-interest-rates-by-a-half-point-to-0-5-ed1fce78?mod=mw_rss_realtimeheadlines",
-      "source": "MarketWatch Real-time",
-      "published": "Thu, 12 Dec 2024 08:32:00 GMT",
-      "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "Powell says labor market not a source of significant inflation pressure",
-      "description": "",
-      "url": "https://www.marketwatch.com/story/powell-says-labor-market-not-a-source-of-significant-inflation-pressure-cc3b1297?mod=mw_rss_realtimeheadlines",
-      "source": "MarketWatch Real-time",
-      "published": "Wed, 31 Jul 2024 18:48:00 GMT",
-      "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "Fed’s Powell says rate cut ‘on the table’ as soon as September",
-      "description": "",
-      "url": "https://www.marketwatch.com/story/feds-powell-says-rate-cut-on-the-table-as-soon-as-september-f3f7c8f2?mod=mw_rss_realtimeheadlines",
-      "source": "MarketWatch Real-time",
-      "published": "Wed, 31 Jul 2024 18:41:00 GMT",
-      "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
-    },
-    {
-      "title": "Final S&P U.S. manufacturing index is 52.2 in February vs. initial 51.5",
-      "description": "",
-      "url": "https://www.marketwatch.com/story/final-s-p-u-s-manufacturing-index-is-52-2-in-february-vs-initial-51-5-180b7107?mod=mw_rss_realtimeheadlines",
-      "source": "MarketWatch Real-time",
-      "published": "Fri, 01 Mar 2024 14:47:00 GMT",
-      "content": "",
-      "collected_at": "2026-03-06T09:06:11.061115-05:00"
+      "title": "U.S. oil prices notch record weekly gain of nearly 36%, as Middle East conflict spurs worries over production cuts",
+      "description": "Oil prices rallied Friday to set a record weekly gain, with the Middle East starting to feel a squeeze in production and storage capacity as the Iran conflict ran through a seventh day.",
+      "url": "https://www.marketwatch.com/story/oil-at-20-month-high-as-qatar-minister-warns-of-halt-to-energy-shipments-ffd3f8f9?mod=mw_rss_topstories",
+      "source": "MarketWatch",
+      "published": "Fri, 06 Mar 2026 20:35:00 GMT",
+      "content": "Oil prices rallied Friday to set a record weekly gain, with the Middle East starting to feel a squeeze in production and storage capacity as the Iran conflict ran through a seventh day.",
+      "collected_at": "2026-03-07T06:38:41.460610-05:00"
     }
   ]
 }
